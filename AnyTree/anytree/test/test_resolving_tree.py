@@ -12,9 +12,17 @@ class TestResolvingTree(unittest.TestCase):
     def test_get_ordre_import(self):
 
         res_country = anytree.get_ordre_importation('admin', 'admin', 'ecox_db', 'res.country',
-                                                    None)
+                                                    None, None)
         res_account_account = anytree.get_ordre_importation('admin', 'admin', 'ecox_db',
-                                                            'account.account', None)
+                                                            'account.account', None, None)
+
+        res_groups_exclusion = anytree.get_ordre_importation('admin', 'admin', 'ecox_db',
+                                                             'res.groups',
+                                                             ['ir.module.category'], None)
+
+        res_groups = anytree.get_ordre_importation('admin', 'admin', 'ecox_db', 'res.groups', None,
+                                                  None)
+
         self.assertEquals(res_country, ['res.country'])
 
         self.assertEquals(res_account_account, ['account.account.type', 'res.currency',
@@ -27,3 +35,7 @@ class TestResolvingTree(unittest.TestCase):
                                                 'sale.shop', 'shop.term', 'ir.actions.actions',
                                                 'res.users', 'res.partner', 'res.company',
                                                 'account.account'])
+
+        self.assertEquals(res_groups_exclusion, ['res.groups'])
+
+        self.assertEquals(res_groups, ['ir.module.category', 'res.groups'])
