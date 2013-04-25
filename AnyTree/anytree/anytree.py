@@ -1,5 +1,6 @@
 import xmlrpclib
 import argparse
+import psycopg2
 
 """ Method to find out the dependencies order to import of an OpenERP model
     Set excluded_models to None if there is no model to exclude.
@@ -96,4 +97,25 @@ def get_ordre_importation(username, pwd, dbname, models, excluded_models,
             res.append(table)
     return res
 
-get_ordre_importation(username, pwd, dbname, models, excluded_models)
+
+def get_mapping_migration(username, pwd, dbname, model):
+
+    #conn = psycopg2.connect(database=dbname, user='fjouatte', password='')
+    #cur = conn.cursor()
+    sock_common = xmlrpclib.ServerProxy('http://localhost:8069/xmlrpc/common')
+    uid = sock_common.login(dbname, username, pwd)
+    sock = xmlrpclib.ServerProxy('http://localhost:8069/xmlrpc/object')
+    for m in model:
+        #m = m.replace('.', '_')
+        records = sock.execute(dbname, uid, pwd, 'ir.model.data', 'search',
+                               [('model', '=', m)])
+        print(records)
+        #select_query = "SELECT * FROM %s;" %m
+        #cur.execute(select_query)
+        #cur.fetchone()
+    #conn.commit()
+    #cur.close()
+    #conn.close()
+
+get_mapping_migration(username, pwd, dbname, models)
+#get_ordre_importation(username, pwd, dbname, models, excluded_models)
