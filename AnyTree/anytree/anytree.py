@@ -1,13 +1,38 @@
 import xmlrpclib
+import argparse
 
 """ Method to find out the dependencies order to import of an OpenERP model
     Set excluded_models to None if there is no model to exclude.
     If you want to exclude some models, use the following syntax :
     excluded_models = ['res.currency', 'res.country']
 """
+parser = argparse.ArgumentParser(description='Return the dependencies order'
+                                             ' of models give as parameters')
+
+parser.add_argument('-m', '--models', nargs='+', help="One or many models",
+                    required=True)
+parser.add_argument('-d', '--db_name',
+                    help="Name of the database to connect to",
+                    required=True)
+parser.add_argument('-u', '--user',
+                    help="Name of the user to log into the database with",
+                    required=True)
+parser.add_argument('-p', '--pwd',
+                    help="Password of the previous user",
+                    required=True)
+parser.add_argument('-x', '--excluded', nargs='+', help="One or many models"
+                    " to exclude", required=False, default=None)
+
+args = parser.parse_args()
+
+username = args.user
+pwd = args.pwd
+dbname = args.db_name
+models = args.models
+excluded_models = args.excluded
 
 
-def get_ordre_importation(username, pwd, dbname, models, excluded_models=None,
+def get_ordre_importation(username, pwd, dbname, models, excluded_models,
                           path=None, seen=None):
     # XML-RPC
     sock_common = xmlrpclib.ServerProxy('http://localhost:8069/xmlrpc/common')
@@ -26,29 +51,27 @@ def get_ordre_importation(username, pwd, dbname, models, excluded_models=None,
     m2m = set()
     related_tables = set()
     for model in models:
-        #print("LECTURE DU MODELE %r " % model)
-        #print
         seen.add(model)
         fields = sock.execute(dbname, uid, pwd, model, 'fields_get')
         for field in fields:
             if fields[field]['type'] == 'many2one':
                 m = fields[field]['relation']
                 # Cas des structures arborescentes (reflexives)
-                #if m in path:
-                    #print(' BOUCLE %s a un m2o %r vers %s, qui est un de ses '
-                    #      'ancetres (path=%r)' % (model, field, m, path))
+                if m in path:
+                    print(' BOUCLE %s a un m2o %r vers %s, qui est un de ses '
+                          'ancetres (path=%r)' % (model, field, m, path))
                 if m not in seen:
                     m2o.add(m)
                     seen.add(m)
             if fields[field]['type'] == 'many2many' and 'related_columns' in fields[field]:
                 m = fields[field]['relation']
                 third_table = fields[field]['third_table']
-                #print(" M2M vers %r THIRD_TABLE : %r" % (m,
-                #      third_table))
+                print(" M2M vers %r THIRD_TABLE : %r" % (m,
+                      third_table))
                 # Cas des structures arborescentes (reflexives)
-                #if m in path:
-                    #print(' BOUCLE %s a un m2m %r vers %s, qui est un de ses '
-                    #      'ancetres (path=%r)' % (model, field, m, path))
+                if m in path:
+                    print(' BOUCLE %s a un m2m %r vers %s, qui est un de ses '
+                          'ancetres (path=%r)' % (model, field, m, path))
                 if m not in seen:
                     m2m.add(m)
                     seen.add(m)
@@ -59,11 +82,13 @@ def get_ordre_importation(username, pwd, dbname, models, excluded_models=None,
         for m in m2m:
             res += get_ordre_importation(username, pwd, dbname, (m,),
                                          path=path+(model,),
-                                         excluded_models=excluded_models, seen=seen)
+                                         excluded_models=excluded_models,
+                                         seen=seen)
         for m in m2o:
             res += get_ordre_importation(username, pwd, dbname, (m,),
                                          path=path+(model,),
-                                         excluded_models=excluded_models, seen=seen)
+                                         excluded_models=excluded_models,
+                                         seen=seen)
 
     res.append(model)
     if related_tables:
@@ -71,5 +96,4 @@ def get_ordre_importation(username, pwd, dbname, models, excluded_models=None,
             res.append(table)
     return res
 
-print(get_ordre_importation('admin', 'admin', 'ecox_db',('res.groups',),['ir.module.category'], None))
-print(get_ordre_importation('admin', 'admin', 'ecox_db',('res.groups',),None, None))
+get_ordre_importation(username, pwd, dbname, models, excluded_models)
