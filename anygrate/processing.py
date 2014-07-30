@@ -365,7 +365,7 @@ class CSVProcessor(object):
                 try:
                     cursor.execute('UPDATE %s SET (%s)=(%s) WHERE id=%s'
                                    % (table, columns, values, '%s'), tuple(args))
-                    cursor.execute('SAVEPOINT savepoint')
+                    cursor.execute('RELEASE SAVEPOINT savepoint; SAVEPOINT savepoint')
                 except Exception, e:
                     LOG.warn('Error updating table %s:\n%s', table, e.message)
                     cursor = connection.cursor()
