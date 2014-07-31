@@ -1,0 +1,196 @@
+base:
+    ir_sequence.*:
+    ir_sequence.number_next:
+        ir_sequence.number_next: |
+            # don't conflict with the next statement (could be avoided with ordereddict)
+            return target_rows['ir_sequence'].get('number_next', source_row['number_next'])
+    ir_sequence.id:
+        ir_sequence.id: |
+            # we don't merge sequences, it's too painful
+            sequence_name = 'ir_sequence_' + source_row['id'].zfill(3)
+            sequence_exists = sql('source', 'select * from pg_class where relname=(%s)', (sequence_name,))
+            if sequence_exists:
+                last_value = sql('source', 'select last_value from %s' % sequence_name)[0][0]
+                target_rows['ir_sequence']['number_next'] = last_value + 1
+                sequence_id = int(source_row['id']) + self.mapping.last_id
+                sql('target',
+                    "create sequence ir_sequence_%03d increment by %%s start with %%s" % sequence_id,
+                    (int(source_row['number_increment']), last_value))
+            return source_row['id']
+    ir_sequence.company_id:
+        # force a company_id and assume 1. Will be offset anyway in multicompany case
+        ir_sequence.company_id: return 1
+
+    ir_mail_server.*:
+
+    ir_attachment.*:
+    ir_attachment.res_id:
+        ir_attachment.res_id: __ref__ res_model
+
+
+    res_partner_title.*:
+    res_partner_title.create_uid:
+        res_partner_title.create_uid: __defer__
+    res_partner_title.write_uid:
+        res_partner_title.write_uid: __defer__
+    res_partner_title.__discriminator__:
+        - name
+
+    res_country.*:
+    res_country.create_uid:
+        res_country.create_uid: __defer__
+    res_country.__discriminator__:
+        - code
+
+    res_country_state.*:
+    res_country_state.write_uid:
+        res_country_state.write_uid: __defer__
+    res_country_state.create_uid:
+        res_country_state.create_uid: __defer__
+    res_country_state.__discriminator__:
+        - code
+
+    res_currency.*:
+    res_currency.__discriminator__:
+        - name
+    res_currency.date: __forget__
+
+    # Company data
+    res_company.*:
+    res_company.__discriminator__:
+        - name
+    res_company.paper_format: __forget__
+    res_company._:
+        res_company.rml_paper_format: return 'a4'
+    res_company.partner_id:
+        res_company.partner_id: __defer__
+    #res_company.create_uid:
+    #    res_company.create_uid: __defer__
+    #res_company.write_uid:
+    #    res_company.write_uid: __defer__
+
+    # Users
+    res_users.*:
+    res_users.__discriminator__:
+        - login
+    res_users.menu_id: __forget__
+    #res_users.company_id:
+    #    res_users.company_id: __defer__
+    #res_users.partner_id:
+    #    res_users.partner_id: __defer__
+    res_users.create_uid:
+        res_users.create_uid: __defer__
+    res_users.write_uid:
+        res_users.write_uid: __defer__
+
+    # Partners
+    res_partner.*:
+    res_partner.__discriminator__:
+        - name
+    res_partner.name:
+        res_partner.name:
+        res_partner.display_name:
+    res_partner.parent_id:
+        res_partner.parent_id: __defer__
+    res_partner.company_id:
+        res_partner.company_id: __defer__
+    res_partner.user_id:
+        res_partner.user_id: __defer__
+    res_partner.create_uid:
+        res_partner.create_uid: __defer__
+    res_partner.write_uid:
+        res_partner.write_uid: __defer__
+
+    res_company_users_rel.*:
+    res_company_users_rel.__discriminator__:
+        - cid
+        - user_id
+
+    res_partner_bank.*:
+    res_partner_bank.__discriminator__:
+        - name
+    res_partner_bank.active: __forget__
+    res_partner_bank.journal_id:
+        res_partner_bank.journal_id: __defer__
+
+    res_bank.*:
+    res_bank.__discriminator__:
+        - name
+
+    res_partner_category.*:
+    res_partner_category.__discriminator__:
+        - name
+    res_partner_category_rel.*:
+
+    # Security Groups
+    ir_module_category.*:
+    ir_module_category.parent_id:
+        ir_module_category.parent_id: __defer__
+
+    res_groups.*:
+    res_groups.__discriminator__:
+        - name
+        - category_id
+
+    res_groups_implied_rel.*:
+    res_groups_implied_rel.__discriminator__:
+        - gid
+        - hid
+
+    #FIXME!
+    #res_groups_users_rel.*:
+    #res_groups_users_rel.__discriminator__:
+    #    - gid
+    #    - uid
+
+    # workflows (we don't migrate workflows, only instances and workitems)
+    wkf_instance.*:
+    wkf_instance.wkf_id:
+        wkf_instance.wkf_id: |
+            self.fk_mapping.setdefault('wkf', {})
+            wkf_id = source_row['wkf_id']
+            if wkf_id not in self.fk_mapping['wkf']:
+                model = sql('source', "select osv from wkf where id=(%s)", (wkf_id,))[0][0]
+                target_wkf_id = sql('target', "select id from wkf where osv=(%s)", (model,))
+                self.fk_mapping['wkf'][wkf_id] = target_wkf_id and target_wkf_id[0][0] or ''
+                if not self.fk_mapping['wkf'][wkf_id]:
+                    raise UserWarning('Could not migrate workflow instance: %s' % source_row)
+            return self.fk_mapping['wkf'][wkf_id]
+    wkf_instance.uid:
+        wkf_instance.uid: __fk__ res_users
+    wkf_instance.res_id:
+        wkf_instance.res_id: __ref__ res_type
+
+    wkf_workitem.*:
+    wkf_workitem.act_id:
+        wkf_workitem.act_id: |
+            self.fk_mapping.setdefault('wkf_activity', {})
+            act_id = source_row['act_id']
+            if act_id not in self.fk_mapping['wkf_activity']:
+                wf, act = sql('source', "select w.name, a.name from wkf w, wkf_activity a where a.wkf_id=w.id and a.id=(%s)", (act_id,))[0]
+                target_act_id = sql('target', "select a.id from wkf w, wkf_activity a where w.name=(%s) and a.wkf_id=w.id and a.name=(%s)", (wf, act))
+                self.fk_mapping['wkf_activity'][act_id] = target_act_id and target_act_id[0][0] or ''
+                if not self.fk_mapping['wkf_activity'][act_id]:
+                    raise UserWarning('Could not migrate workflow workitem: %s' % source_row)
+            return self.fk_mapping['wkf_activity'][act_id]
+
+    wkf_triggers.*:
+    wkf_triggers.res_id:
+        wkf_triggers.res_id: __ref__ model
+
+
+mail:
+    res_partner.notification_email_send:
+        res_partner.notify_email: return 'none' if source_row['notification_email_send'] == 'none' else 'always'
+
+    mail_alias.*:
+    mail_alias.__discriminator__:
+        - alias_name
+    mail_alias._:
+        mail_alias.alias_contact: return 'everyone'
+    mail_alias.alias_user_id:
+        mail_alias.alias_user_id: __defer__
+    mail_alias.create_uid:
+        mail_alias.create_uid: __defer__
+    mail_alias.write_uid:
+        mail_alias.write_uid: __defer__
