@@ -94,6 +94,15 @@ def migrate(source_db, target_db, source_tables, mapping_names,
         c.execute("select name from ir_module_module where state='installed'")
         target_modules = [m[0] for m in c.fetchall()]
 
+    # construct the mapping and the csv processor
+    # doing it first for early mapping validation and availability to exporting
+    for i, mapping_name in enumerate(mapping_names):
+        if not exists(mapping_name):
+            mapping_names[i] = join(HERE, 'mappings', mapping_name)
+            LOG.warn('%s not found. Trying %s', mapping_name, mapping_names[i])
+    mapping = Mapping(target_modules, mapping_names)
+    processor = CSVProcessor(mapping)
+
     # we turn the list of wanted tables into the full list of required tables
     print(u'Computing the real list of tables to export...')
     #source_models, _ = get_dependencies('admin', 'admin',
@@ -102,15 +111,10 @@ def migrate(source_db, target_db, source_tables, mapping_names,
                                                    excluded)
     print(u'The real list of tables to export is: %s' % ', '.join(source_tables))
 
-    # construct the mapping and the csv processor
+    # Export tables
     print('Exporting tables as CSV files...')
-    filepaths = export_to_csv(source_tables, target_dir, source_connection)
-    for i, mapping_name in enumerate(mapping_names):
-        if not exists(mapping_name):
-            mapping_names[i] = join(HERE, 'mappings', mapping_name)
-            LOG.warn('%s not found. Trying %s', mapping_name, mapping_names[i])
-    mapping = Mapping(target_modules, mapping_names)
-    processor = CSVProcessor(mapping)
+    filepaths = export_to_csv(
+        source_tables, target_dir, source_connection, mapping.extract_sql)
     target_tables = processor.get_target_columns(filepaths).keys()
     print(u'The real list of tables to import is: %s' % ', '.join(target_tables))
     processor.mapping.update_last_id(source_tables, source_connection,
