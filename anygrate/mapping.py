@@ -28,6 +28,7 @@ class Mapping(object):
         # filter to keep only wanted modules
         self.mapping = {}
         self.deferred = {}
+        self.extract_sql = {}
         for module in modules:
             if module not in full_mapping:
                 LOG.warn('Mapping is not complete: module "%s" is missing!', module)
@@ -97,6 +98,11 @@ class Mapping(object):
                 key.split('.')[0]: value
                 for key, value in mapping.items()
                 if '__discriminator__' in key})
+            # define query to pass to COPY instead of bare table name
+            self.extract_sql.update({
+                key.split('.')[0]: value
+                for key, value in mapping.items()
+                if '__query__' in key})
 
     def newid(self):
         """ increment the global stored last_id

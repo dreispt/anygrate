@@ -6,14 +6,26 @@ logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(basename(__file__))
 
 
-def export_to_csv(tables, dest_dir, connection):
-    """ Export data using postgresql COPY
+def export_to_csv(tables, dest_dir, connection, extract_sql=None):
+    """
+    Export data using postgresql COPY
+    extract_sql is an optional dict specifying a specific SQL to extract data.
     """
     csv_filenames = []
+    extract_sql = extract_sql or {}
     for table in tables:
         filename = join(dest_dir, table + '.csv')
         with connection.cursor() as cursor, open(filename, 'w') as f:
-            cursor.copy_expert("COPY %s TO STDOUT WITH CSV HEADER NULL ''" % table, f)
+            extract_from = extract_sql.get(table)
+            if not extract_from:
+                copy_expr = table
+            elif extract_from.upper().startswith('SELECT '):
+                copy_expr = "(" + extract_from + ")"
+            else:
+                copy_expr = "(SELECT * FROM %s WHERE %s)" % (
+                    table, extract_from)
+            cursor.copy_expert(
+                "COPY %s TO STDOUT WITH CSV HEADER NULL ''" % copy_expr, f)
             csv_filenames.append(filename)
     return csv_filenames
 

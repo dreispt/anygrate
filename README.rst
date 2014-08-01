@@ -243,6 +243,36 @@ used to migrate one source ``res_users`` line to three different lines: one in
 ``res_users`` + one in ``res_partner`` + one in ``mail_alias``. See the default
 mapping for a real example.
 
+Use specific queries to extract source data
+-------------------------------------------
+
+By default full tables are extracted from the source database.
+
+If you want to extract only part of the data, or use a specific SQL sentence for the
+table data extraction, use the special source column ``__query__``::
+
+    module:
+        table1.__query__: <WHERE expression | SQL statement>
+
+Example for using a specific filter: suppose you only want to extract active
+Partners for Company 1::
+
+    module:
+        table1.__query__: active = 't' and company_id=1
+
+
+Example for using a full SQL sentence: suppose you need to inject into the
+source table a column from another related table. A specific case for this
+is the ``product_template`` in version 8.0 now hosting columns previously
+stored in the ``product_product`` table::
+
+    product
+        product_template.*:
+        product_template.__query__: |
+            SELECT t.*, p.color
+            FROM product_template t
+            INNER JOIN product_product p on p.product_templ_id = t.id
+
 Data moved to another table (table merging)
 -------------------------------------------
 
