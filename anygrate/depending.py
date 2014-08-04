@@ -84,7 +84,7 @@ def get_sql_dependencies(target_connection, tables, initial_tables,
             c.execute(query_fk)
             foreign_keys = c.fetchall()
 
-            if table in real_tables:
+            if table in real_tables and not table.endswith('_rel'):
                 if foreign_keys:
                     for foreign_key in foreign_keys:
                         tbl = foreign_key[0]
