@@ -66,8 +66,8 @@ def main():
         print '\n'.join(listdir(join(HERE, 'mappings')))
         sys.exit(0)
 
-    if not all([source_db, target_db, relation]):
-        print 'Please provide at least -s, -t and -r options'
+    if not all([source_db, target_db]):
+        print 'Please provide both -s and -t options'
         sys.exit(1)
 
     if args.keepcsv:
@@ -105,8 +105,7 @@ def migrate(source_db, target_db, source_tables, mapping_names,
 
     # we turn the list of wanted tables into the full list of required tables
     print(u'Computing the real list of tables to export...')
-    #source_models, _ = get_dependencies('admin', 'admin',
-    #                                    source_db, source_models, excluded_models)
+    source_tables = source_tables or mapping.get_sources()
     source_tables, m2m_tables = add_related_tables(source_connection, source_tables,
                                                    excluded)
     print(u'The real list of tables to export is: %s' % ', '.join(source_tables))
