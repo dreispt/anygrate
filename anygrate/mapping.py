@@ -149,13 +149,17 @@ class Mapping(object):
             self.target_tables = list(self.target_tables)
             return self.target_tables
 
-    def get_sources(self, target):
+    def get_sources(self, target=None):
         """ Return the source tables given a target table
+            If none, return all mapped source tables.
         """
-        return sorted(list({t[0].split('.')[0]
-                            for t in self.mapping.items()
-                            if target in [c.split('.')[0]
-                                          for c in type(t[1]) is dict and t[1].keys() or ()]}))
+        res = {t[0].split('.')[0]
+               for t in self.mapping.items()
+               if not target
+               or target in [
+                   c.split('.')[0]
+                   for c in type(t[1]) is dict and t[1].keys() or ()]}
+        return sorted(list(res))
 
     def update_last_id(self, source_tables, source_connection, target_tables, target_connection):
         """ update the last_id with max of source and target dbs
