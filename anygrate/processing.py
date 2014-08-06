@@ -27,8 +27,8 @@ class CSVProcessor(object):
         self.ref_mapping = {}  # mapping for references
         self.lines = 0
         self.is_moved = set()
-        self.existing_records = {}
-        self.existing_records_without_id = {}
+        ###self.existing_records = {}
+        ###self.existing_records_without_id = {}
 
     def get_target_columns(self, filepaths):
         """ Compute target columns with source columns + mapping
@@ -99,7 +99,7 @@ class CSVProcessor(object):
         return ordered_tables
 
     def process(self, source_dir, source_filenames, target_dir,
-                target_connection=None):
+                target_connection, discriminations):
         """ The main processing method
         """
         # compute the target columns
@@ -144,7 +144,7 @@ class CSVProcessor(object):
         ordered_tables = self.reorder_with_discriminators(source_tables)
         ordered_paths = [join(source_dir, table + '.csv') for table in ordered_tables]
         for source_filepath in ordered_paths:
-            self.process_one(source_filepath, target_connection)
+            self.process_one(source_filepath, target_connection, discriminations)
         # close files
         for target_file in target_files.values():
             target_file.close()
@@ -167,7 +167,7 @@ class CSVProcessor(object):
         LOG.info(u"Postprocessing CSV files...")
         for filename in target_filenames.values():
             filepath = join(target_dir, filename)
-            self.postprocess_one(filepath)
+            self.postprocess_one(filepath, discriminations)
         for f in target2_files.values():
             f.close()
 
@@ -186,17 +186,18 @@ class CSVProcessor(object):
             writer.writeheader()
         for filename in update_filenames.values():
             filepath = join(target_dir, filename)
-            self.postprocess_one(filepath)
+            self.postprocess_one(filepath, discriminations)
         # close files
         for f in update2_files.values():
             f.close()
 
     def process_one(self, source_filepath,
-                    target_connection=None):
+                    target_connection, discriminations):
         """ Process one csv file
         The fk_mapping should not be read in this method. Only during postprocessing,
         Because the processing order is not determined (unordered dicts)
         """
+        count_ins, count_upd = 0, 0
         source_table = basename(source_filepath).rsplit('.', 1)[0]
         with open(source_filepath, 'rb') as source_csv:
             reader = csv.DictReader(source_csv, delimiter=',')
@@ -246,50 +247,54 @@ class CSVProcessor(object):
                 for table, target_row in target_rows.items():
                     if not any(target_row.values()):
                         continue
-                    discriminators = self.mapping.discriminators.get(table)
                     # if the line exists in the target db, we don't offset and write to update file
                     # (we recognize by matching the dict of discriminator values against existing)
-                    existing = self.existing_records.get(table, [])
-                    existing_without_id = self.existing_records_without_id.get(table, [])
-                    discriminator_values = {d: target_row[d] for d in (discriminators or [])}
+                    ###existing = self.existing_records.get(table, [])
+                    ###existing_without_id = self.existing_records_without_id.get(table, [])
+                    ###discriminator_values = {d: target_row[d] for d in (discriminators or [])}
+                    discriminators = sorted(self.mapping.discriminators.get(table, {}))
+                    discriminator_value = tuple([target_row[x] for x in discriminators])
+                    existing_id = int(discriminations.get(table, {}).get(discriminator_value, '0'))
+                    row_id = target_row.get('id')
+                    # print(discriminators, discriminator_value, existing_id, row_id)
                     # before matching existing, we should fix the discriminator_values which are fk
-                    # FIXME refactor and merge with the code in postprocess
-                    for key, value in discriminator_values.items():
-                        fk_table = self.fk2update.get(table + '.' + key)
-                        if value and fk_table:
-                            value = int(value)
-                            # this is BROKEN because it needs the fk_table to be processed before.
-                            if value in self.fk_mapping.get(fk_table, []):
-                                discriminator_values[key] = str(
-                                    self.fk_mapping[fk_table].get(value, value))
-                    # save the mapping between source id and existing id
-                    if (discriminators
-                            and 'id' in target_row
-                            and all(discriminator_values.values())
-                            and discriminator_values in existing_without_id):
-                        # find the id of the existing record in the target
-                        for i, nt in enumerate(existing):
-                            if discriminator_values == {k: str(v)
-                                                        for k, v in nt.iteritems() if k != 'id'}:
-                                existing_id = existing[i]['id']
-                                break
-                        self.fk_mapping.setdefault(table, {})
+                    #### FIXME refactor and merge with the code in postprocess
+                    ###for key, value in discriminator_values.items():
+                    ###    fk_table = self.fk2update.get(table + '.' + key)
+                    ###    if value and fk_table:
+                    ###        value = int(value)
+                    ###        # this is BROKEN because it needs the fk_table to be processed before.
+                    ###        if value in self.fk_mapping.get(fk_table, []):
+                    ###            discriminator_values[key] = str(
+                    ###                self.fk_mapping[fk_table].get(value, value))
+                    if row_id and existing_id:
+                        # write to .update.csv
+                        # save the mapping between source id and existing id
                         # we save the match between source and existing id
                         # to be able to update the fks in the 2nd pass
-                        self.fk_mapping[table][int(target_row['id'])] = existing_id
-
+                        # if row_id != existing_id:
+                        self.fk_mapping.setdefault(table, {})
+                        self.fk_mapping[table][int(row_id)] = existing_id
                         # fix fk to a moved table with existing data
                         if source_table in self.is_moved:
                             source_id = int(source_row['id'])
                             if source_id in self.fk_mapping[source_table]:
                                 target_row['id'] = existing_id
                                 self.fk_mapping[source_table][source_id] = existing_id
-
                         self.updatewriters[table].writerow(target_row)
+                        count_upd += 1
+
                     else:
+                        # write to .target.csv
                         # offset the id of the line, except for m2m (no id)
                         if 'id' in target_row:
-                            target_row['id'] = int(target_row['id']) + self.mapping.last_id
+                            if 'id' not in discriminators:  # else keep id
+                                target_row['id'] = int(row_id) + self.mapping.last_id
+                            ###else:
+                            # add to relations map
+                            self.fk_mapping.setdefault(table, {})
+                            self.fk_mapping[table][int(row_id)] = int(row_id)
+                            if table.startswith('note_note'): print(row_id, target_row['id']) #FIXME
                             # handle deferred records
                             if table in self.mapping.deferred:
                                 upd_row = {k: v for k, v in target_row.iteritems()
@@ -307,32 +312,46 @@ class CSVProcessor(object):
                             continue
                         # otherwise write the target csv line
                         self.writers[table].writerow(target_row)
-            LOG.debug("Processed %s." % source_table)
+                        count_ins += 1
+                    #if table == 'note_stage_rel': print(target_row) #FIXME
+        LOG.debug("Processed\t%s:\t%d ins\t%d upd"
+                  % (source_table, count_ins, count_upd))
 
-    def postprocess_one(self, target_filepath):
+    def postprocess_one(self, target_filepath, discriminations):
         """ Postprocess one target csv file
         """
+        __debug = 'note_stage'
+        counter = 0
         table = basename(target_filepath).rsplit('.', 2)[0]
+        m2m_rows = []
         with open(target_filepath, 'rb') as target_csv:
             reader = csv.DictReader(target_csv, delimiter=',')
             for target_row in reader:
+                counter += 1
                 postprocessed_row = {}
                 # fix the foreign keys of the line
                 for key, value in target_row.items():
                     target_record = table + '.' + key
                     postprocessed_row[key] = value
-                    fk_table = self.fk2update.get(target_record)
                     # if this is a fk, fix it
+                    fk_table = self.fk2update.get(target_record)
                     if value and fk_table:
                         # if the target record is an existing record it should be in the fk_mapping
                         # so we restore the real target id, or offset it if not found
                         value = int(value)
                         postprocessed_row[key] = self.fk_mapping.get(fk_table, {}).get(
                             value, value + self.mapping.last_id)
+                            #print(fk_table, self.fk_mapping.get(fk_table)) #FIXME
                     # if we're postprocessing an update we should restore the id as well
-                    if key == 'id' and table in self.fk_mapping:
-                        value = int(value)
-                        postprocessed_row[key] = self.fk_mapping[table].get(value, value)
+                    if key == 'id':
+                        if table in self.fk_mapping:
+                            value = int(value)
+                            postprocessed_row[key] = self.fk_mapping[table].get(value, value)
+                            if table == __debug: print(key, target_row[key], postprocessed_row[key]) #FIXME
+                        else:
+                            postprocessed_row[key] = value
+                        if table == __debug: print(key, target_row[key], postprocessed_row[key]) #FIXME
+
                     if value and target_record in self.ref_mapping:  # manage __ref__
                         # first find the target table of the reference
                         value = int(value)
@@ -340,14 +359,18 @@ class CSVProcessor(object):
                         ref_table = target_row[ref_column].replace('.', '_')
                         postprocessed_row[key] = self.fk_mapping.get(ref_table, {}).get(
                             value, value + self.mapping.last_id)
+                #if table == __debug: print(key, target_row, postprocessed_row) #FIXME
                 # don't write m2m lines if they exist in the target
-                # FIXME: refactor these 4 lines with those from process_one()?
-                discriminators = self.mapping.discriminators.get(table)
-                existing_without_id = self.existing_records_without_id.get(table, [])
-                discriminator_values = {d: str(postprocessed_row[d])
-                                        for d in (discriminators or [])}
-                if 'id' in postprocessed_row or discriminator_values not in existing_without_id:
-                    self.writers[table].writerow(postprocessed_row)
+                if 'id' not in postprocessed_row:
+                    m2m_row = tuple([
+                        str(postprocessed_row[x])
+                        for x in sorted(postprocessed_row.keys())])
+                    if m2m_row in m2m_rows or m2m_row in discriminations.get(table):
+                        continue
+                    m2m_rows.append(m2m_row)
+                self.writers[table].writerow(postprocessed_row)
+                #if table.startswith('note_'): print(target_row, postprocessed_row) #FIXME
+            LOG.debug("Postprocessed %s: %d rows" % (table, counter))
 
     def update_one(self, filepath, connection):
         """ Apply updates in the target db with update file

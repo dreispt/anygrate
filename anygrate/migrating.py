@@ -4,6 +4,7 @@ import psycopg2
 import shutil
 import argparse
 from tempfile import mkdtemp
+from . import exporting
 from .exporting import export_to_csv, extract_existing
 from .importing import import_from_csv
 from .mapping import Mapping
@@ -121,18 +122,21 @@ def migrate(source_db, target_db, source_tables, mapping_names,
 
     print('Computing the list of Foreign Keys to update in the target csv files...')
     processor.fk2update = get_fk_to_update(target_connection, target_tables)
-
     # update the list of fk to update with the fake __fk__ given in the mapping
     processor.fk2update.update(processor.mapping.fk2update)
+    i#import pprint; pprint.pprint(processor.fk2update); exit(0)
 
     # extract the existing records from the target database
-    existing_records = extract_existing(target_tables, m2m_tables,
-                                        mapping.discriminators, target_connection)
+    #existing_records = extract_existing(target_tables, m2m_tables,
+    #                                    mapping.discriminators, target_connection)
+    #processor.set_existing_data(existing_records)
+    discriminations = exporting.get_discriminations(
+        target_tables, m2m_tables, mapping.discriminators,
+        source_connection, target_connection)
 
     # create migrated csv files from exported csv files
     print(u'Migrating CSV files...')
-    processor.set_existing_data(existing_records)
-    processor.process(target_dir, filepaths, target_dir, target_connection)
+    processor.process(target_dir, filepaths, target_dir, target_connection, discriminations)
 
     # import data in the target
     print(u'Trying to import data in the target database...')
