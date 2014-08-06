@@ -16,7 +16,10 @@ def import_from_csv(filepaths, connection):
     cursor.execute('SAVEPOINT savepoint')
     cursor.close()
     while len(remaining) > 0:
-        LOG.info(u'BRUTE FORCE LOOP')
+        LOG.info(u'==== BRUTE FORCE LOOP ====')
+        table_list = [x.split('/')[-1].split('.')[0] for x in remaining]
+        LOG.debug(u"Remaining:\n%s" % '\t'.join(table_list))
+
         paths = list(remaining)
         for filepath in paths:
             if not exists(filepath):
