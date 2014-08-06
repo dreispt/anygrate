@@ -30,7 +30,7 @@ def import_from_csv(filepaths, connection):
                 try:
                     cursor = connection.cursor()
                     cursor.copy_expert(copy, f)
-                    cursor.execute('SAVEPOINT savepoint')
+                    cursor.execute('RELEASE SAVEPOINT savepoint; SAVEPOINT savepoint')
                     LOG.info('Succesfully imported %s' % basename(filepath))
                     remaining.remove(filepath)
                 except Exception, e:
