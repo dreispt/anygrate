@@ -247,6 +247,10 @@ class CSVProcessor(object):
                     if not any(target_row.values()):
                         continue
                     discriminators = self.mapping.discriminators.get(table)
+                    if 'id' in discriminators:
+                        # special discriminator 'id' keeps row original id
+                        self.writers[table].writerow(target_row)
+                        continue
                     # if the line exists in the target db, we don't offset and write to update file
                     # (we recognize by matching the dict of discriminator values against existing)
                     existing = self.existing_records.get(table, [])
