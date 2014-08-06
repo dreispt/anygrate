@@ -307,6 +307,7 @@ class CSVProcessor(object):
                             continue
                         # otherwise write the target csv line
                         self.writers[table].writerow(target_row)
+            LOG.debug("Processed %s." % source_table)
 
     def postprocess_one(self, target_filepath):
         """ Postprocess one target csv file
