@@ -26,14 +26,20 @@ def import_from_csv(filepaths, connection):
                 LOG.warn(u'Missing CSV for table %s', filepath.rsplit('.', 2)[0])
                 continue
             with open(filepath) as f:
+                table = basename(filepath).rsplit('.', 2)[0]
                 columns = ','.join(['"%s"' % c for c in csv.reader(f).next()])
                 f.seek(0)
                 copy = ("COPY %s (%s) FROM STDOUT WITH CSV HEADER NULL ''"
-                        % (basename(filepath).rsplit('.', 2)[0], columns))
+                        % (table, columns))
                 try:
                     cursor = connection.cursor()
                     cursor.copy_expert(copy, f)
-                    cursor.execute('RELEASE SAVEPOINT savepoint; SAVEPOINT savepoint')
+                    if 'id' in columns.split(','):
+                        sql = "SELECT setval('%s_id_seq', max(id)) FROM %s" % (
+                            table, table)
+                        cursor.execute(sql)
+                    sql = 'RELEASE SAVEPOINT savepoint; SAVEPOINT savepoint'
+                    cursor.execute(sql)
                     LOG.info('Succesfully imported %s' % basename(filepath))
                     remaining.remove(filepath)
                 except Exception, e:
@@ -44,7 +50,7 @@ def import_from_csv(filepaths, connection):
                     cursor.close()
         if len(paths) == len(remaining):
             LOG.error('\n\n***\n* Could not import remaining tables : %s :-( \n***\n'
-                      % ', '.join([basename(f).rsplit('.', 2)[0] for f in remaining]))
+                      % ', '.join([basename(x).rsplit('.', 2)[0] for x in remaining]))
             # don't permit update for non imported files
             for update_file in [filename.replace('.target2.csv', '.update2.csv')
                                 for filename in remaining]:
