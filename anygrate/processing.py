@@ -22,10 +22,10 @@ class CSVProcessor(object):
         self.mapping = mapping  # mapping.Mapping instance
         self.target_columns = {}
         self.writers = {}
-        self.updated_values = {}
         self.fk_mapping = {}  # mapping for foreign keys
         self.ref_mapping = {}  # mapping for references
         self.lines = 0
+        self.stats = {}
         self.is_moved = set()
         self.existing_records = {}
         self.existing_records_without_id = {}
@@ -190,6 +190,15 @@ class CSVProcessor(object):
         # close files
         for f in update2_files.values():
             f.close()
+        # display summay statistics
+        print("-"*24 + "\tins\tupd\tpostprocess")
+        for table, stats in self.stats.items():
+            data = {'table': table.rjust(24, ' '),
+                    'ins': 0, 'upd': 0,
+                    'postprocess': 0}
+            data.update(stats or {})
+            print("%(table)s\t%(ins)d\t%(upd)d\t%(postprocess)d" % data)
+        print("-"*24)
 
     def process_one(self, source_filepath,
                     target_connection=None):
@@ -200,6 +209,7 @@ class CSVProcessor(object):
         source_table = basename(source_filepath).rsplit('.', 1)[0]
         with open(source_filepath, 'rb') as source_csv:
             reader = csv.DictReader(source_csv, delimiter=',')
+            stats = {'ins': 0, 'upd': 0}
             # process each csv line
             for source_row in reader:
                 self.lines += 1
@@ -286,6 +296,7 @@ class CSVProcessor(object):
                                 self.fk_mapping[source_table][source_id] = existing_id
 
                         self.updatewriters[table].writerow(target_row)
+                        stats['upd'] += 1
                     else:
                         # offset the id of the line, except for m2m (no id)
                         if 'id' in target_row:
@@ -307,7 +318,10 @@ class CSVProcessor(object):
                             continue
                         # otherwise write the target csv line
                         self.writers[table].writerow(target_row)
-            LOG.debug("Processed %s." % source_table)
+                        stats['ins'] += 1
+            self.stats[source_table] = stats
+            LOG.debug("Processed %s:\t\t%d ins\t%d upd"
+                      % (source_table, stats['ins'], stats['upd']))
 
     def postprocess_one(self, target_filepath):
         """ Postprocess one target csv file
@@ -315,6 +329,7 @@ class CSVProcessor(object):
         table = basename(target_filepath).rsplit('.', 2)[0]
         with open(target_filepath, 'rb') as target_csv:
             reader = csv.DictReader(target_csv, delimiter=',')
+            stats = {'postprocess': 0}
             for target_row in reader:
                 postprocessed_row = {}
                 # fix the foreign keys of the line
@@ -348,6 +363,10 @@ class CSVProcessor(object):
                                         for d in (discriminators or [])}
                 if 'id' in postprocessed_row or discriminator_values not in existing_without_id:
                     self.writers[table].writerow(postprocessed_row)
+                    stats['postprocess'] += 1
+            self.stats.setdefault(table, {}).update(stats)
+            LOG.debug("Postprocessing %s:\t\t%d rows"
+                      % (table, stats['postprocess']))
 
     def update_one(self, filepath, connection):
         """ Apply updates in the target db with update file
