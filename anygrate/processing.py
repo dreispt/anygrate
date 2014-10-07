@@ -353,6 +353,8 @@ class CSVProcessor(object):
                         value = int(value)
                         ref_column = self.ref_mapping[target_record]
                         ref_table = target_row[ref_column].replace('.', '_')
+                        # TODO: some models with __ref__ should skip rows where
+                        #       the related row does not exist
                         postprocessed_row[key] = self.fk_mapping.get(ref_table, {}).get(
                             value, value + self.mapping.last_id)
                 # don't write m2m lines if they exist in the target
