@@ -34,7 +34,7 @@ def import_from_csv(filepaths, connection):
                 try:
                     cursor = connection.cursor()
                     cursor.copy_expert(copy, f)
-                    if 'id' in columns.split(','):
+                    if '"id"' in columns.split(','):
                         sql = "SELECT setval('%s_id_seq', max(id)) FROM %s" % (
                             table, table)
                         cursor.execute(sql)
