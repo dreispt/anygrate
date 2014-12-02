@@ -22,11 +22,12 @@ base:
         ir_sequence.company_id: return 1
 
     ir_mail_server.*:
+    ir_mail_server.__discriminator__:
+        - name
 
     ir_attachment.*:
     ir_attachment.res_id:
         ir_attachment.res_id: __ref__ res_model
-
 
     res_partner_title.*:
     res_partner_title.create_uid:
@@ -64,20 +65,18 @@ base:
         res_company.rml_paper_format: return 'a4'
     res_company.partner_id:
         res_company.partner_id: __defer__
-    #res_company.create_uid:
-    #    res_company.create_uid: __defer__
-    #res_company.write_uid:
-    #    res_company.write_uid: __defer__
+    res_company.create_uid:
+        res_company.create_uid: __defer__
+    res_company.write_uid:
+        res_company.write_uid: __defer__
 
     # Users
     res_users.*:
     res_users.__discriminator__:
         - login
     res_users.menu_id: __forget__
-    #res_users.company_id:
-    #    res_users.company_id: __defer__
-    #res_users.partner_id:
-    #    res_users.partner_id: __defer__
+    res_users.alias_id:
+        res_users.alias_id: return source_row['alias_id'] or 1
     res_users.create_uid:
         res_users.create_uid: __defer__
     res_users.write_uid:
@@ -102,9 +101,6 @@ base:
         res_partner.write_uid: __defer__
 
     res_company_users_rel.*:
-    res_company_users_rel.__discriminator__:
-        - cid
-        - user_id
 
     res_partner_bank.*:
     res_partner_bank.__discriminator__:
@@ -120,28 +116,30 @@ base:
     res_partner_category.*:
     res_partner_category.__discriminator__:
         - name
-    res_partner_category_rel.*:
+    res_partner_res_partner_category_rel.*:
 
     # Security Groups
-    ir_module_category.*:
-    ir_module_category.parent_id:
-        ir_module_category.parent_id: __defer__
-
-    res_groups.*:
-    res_groups.__discriminator__:
-        - name
-        - category_id
-
-    res_groups_implied_rel.*:
-    res_groups_implied_rel.__discriminator__:
-        - gid
-        - hid
-
-    #FIXME!
+    # It's not wise to maps Security Groups, because of significant changes
+    # User groups should be setup manually after migration
+    #ir_module_category.*:
+    #ir_module_category.__discriminator__:
+    #    - name
+    #ir_module_category.parent_id:
+    #    ir_module_category.parent_id: __defer__
+    #
+    #res_groups.*:
+    #res_groups.__discriminator__:
+    #    - name
+    #
+    #res_groups_implied_rel.*:
     #res_groups_users_rel.*:
-    #res_groups_users_rel.__discriminator__:
-    #    - gid
-    #    - uid
+
+    # External identifiers for data interfaces
+    ir_model_data.*:
+    ir_model_data.__query__: module = '__export__'
+    ir_model_data.res_id:
+        ir_model_data.res_id: __ref__ model
+
 
     # workflows (we don't migrate workflows, only instances and workitems)
     wkf_instance.*:
@@ -179,7 +177,43 @@ base:
         wkf_triggers.res_id: __ref__ model
 
 
+auth_ldap:
+    res_company_ldap.*:
+    res_company_ldap.__discriminator__:
+        - ldap_server
+
+
+document:
+    document_directory.*:
+    document_directory.__discriminator__:
+        - name
+
+    ir_attachment.file_type:
+    ir_attachment.index_content:
+    ir_attachment.parent_id:
+    ir_attachment.partner_id:
+    ir_attachment.user_id:
+
+
+email_template:
+    email_template.*:
+    email_template.__discriminator__:
+        - name
+    email_template.email_recipients:
+        email_template.partner_to:
+    email_template._:
+        email_template.use_default_to: return False
+    # TODO: ?
+    #email_template.model_id:
+    #    email_template.model_id: |
+    #        name = sql('source', 'select name from ir_model where id=%s', (source_row['model_id'],))
+    #        model_id = sql('target', 'select id from ir_model where name=%s', (name[0][0],)) if name and name[0] else None
+    #        return model_id[0][0] if model_id and model_id[0] else None
+    email_template_attachment_rel.*:
+
+
 mail:
+
     res_partner.notification_email_send:
         res_partner.notify_email: return 'none' if source_row['notification_email_send'] == 'none' else 'always'
 
@@ -194,3 +228,217 @@ mail:
         mail_alias.create_uid: __defer__
     mail_alias.write_uid:
         mail_alias.write_uid: __defer__
+
+
+    mail_mail.*:
+    mail_mail.email_from: __forget__
+    mail_mail.mail_server_id: __forget__
+    mail_mail.reply_to: __forget__
+    mail_mail._:
+        mail_mail.headers: return '{}'
+    # TODO: new v8 table - mail_mail_res_partner_rel
+
+    # Menu options specific to Mail Groups
+    #ir_ui_menu.*:
+    #ir_ui_menu.__discriminator__:
+    #    - name
+    #ir_ui_menu.__query__: |
+    #    select * from ir_ui_menu m
+    #    where m.id in (select distinct menu_id from mail_group)
+    #       or m.name in ('My Groups', 'Messaging')
+
+    mail_group.*:
+    mail_group.__discriminator__:
+        - name
+    mail_group.menu_id:
+        mail_group.menu_id: return 1
+    mail_group_res_group_rel.*:
+
+    mail_message_subtype.*:
+    mail_message_subtype.__discriminator__:
+        - name
+        - res_model
+
+    mail_followers.*:
+
+    mail_followers.res_id:
+        mail_followers.res_id: __ref__ res_model
+    mail_followers_mail_message_subtype_rel.*:
+
+    mail_message.*:
+    mail_message.res_id:
+        mail_message.res_id: __ref__ model
+    mail_message_res_partner_rel.*:
+    message_attachment_rel.*:
+
+    mail_notification.*:
+    mail_notification.read:
+        mail_notification.is_read:
+
+    mail_vote.*:
+
+
+email_template:
+
+    email_template.*:
+    email_template.email_recipients:
+        email_template.partner_to:
+    email_template._:
+        email_template.use_default_to: return False
+
+
+note:
+    note_note.*:
+    note_note.__discriminator__:
+        - id  # keep source id at target db!
+
+    note_stage.*:
+    note_stage_rel.*:
+
+    note_tag.*:
+    note_tag.__discriminator__:
+        - name
+    note_tags_rel.*:
+
+
+analytic:
+
+    account_analytic_account.*:
+    account_analytic_account.__discriminator__:
+        - name
+        - code
+    #account_analytic_line.*:
+
+project:
+    project_category.*:
+    project_category.__discriminator__:
+        - name
+    project_category_project_issue_rel.*:
+
+    project_project.*:
+    project_project.priority: __forget__
+    project_user_rel.*:
+
+    project_task.*:
+    project_task.state: __forget__
+    project_task.contact_id:
+        project_task.reviewer_id:
+    project_task.priority:
+        project_task.priority: |
+            return {'4': '0', '3': '0', '2': '1', '1': '1', '0': '2'}.get(source_row['priority'])
+    project_task_delegate.*:
+    project_task_history.*:
+    project_task_history.state: __forget__
+    project_task_parent_rel.*:
+    project_task_type.*:
+    project_task_type_rel.*:
+
+    project_task_project_category_rel.*:
+    project_task_work.*:
+
+    project_category.code: __forget__
+    project_project.is_servicedesk: __forget__
+    project_task.reason_id: __forget__
+    project_task.issue_id: __forget__
+
+project_issue:
+    project_issue.*:
+    project_issue.channel_id: __forget__
+    project_issue.state: __forget__
+    project_issue.priority:
+        project_issue.priority: |
+            return { '5': '0', '4': '0', '3': '1', '2': '1', '1': '2'}.get(source_row['priority'])
+    project_issue.name:
+        project_issue.name: return '%s [%s]' % (source_row['name'], source_row['id'])
+    project_issue_version.*:
+
+    project_issue.regarding_uid: __forget__
+
+
+product:
+    product_ul.*:
+    product_ul.__discriminator__:
+        - name
+    product_uom.*:
+    product_uom.__discriminator__:
+        - name
+    product_category.*:
+    product_category.__discriminator__:
+        - name
+        - parent_id
+    product_uom_categ.*:
+    product_uom_categ.__discriminator__:
+        - name
+
+    product_product.*:
+    product_product.__discriminator__:
+        - name_template
+    product_product.color: __forget__
+    product_product.image_medium: __forget__
+    product_product.image_small: __forget__
+    product_product.image:
+        product_product.image_variant:
+    product_product.price_extra: __forget__
+    product_product.price_margin: __forget__
+    product_product.variants: __forget__
+
+    product_template.*:
+    product_template.__discriminator__:
+        - name
+    product_template.cost_method: __forget__
+    product_template.produce_delay: __forget__
+    product_template.standard_price: __forget__
+    product_template._:
+        product_template.active: return True
+
+    product_pricelist.*:
+    product_pricelist.__discriminator__:
+        - name
+    product_pricelist_version.*:
+    product_pricelist_version.__discriminator__:
+        - name
+        - pricelist_id
+    product_pricelist_item.*:
+    product_pricelist_item.__discriminator__:
+        - name
+        - price_version_id
+    product_price_type.*:
+    product_price_type.__discriminator__:
+        - name
+#    product_supplierinfo.*: #TODO
+
+
+hr:
+    hr_employee.*:
+    hr_employee.__discriminator__:
+        - identification_id
+        - work_email
+    hr_employee.public_info: __forget__
+    hr_employee.visibility: __forget__
+
+    hr_employee_category.*:
+    hr_employee_category.__discriminator__:
+        - name
+    employee_category_rel.*:
+
+    hr_department.*:
+    hr_department.__discriminator__:
+        - name
+    hr_department.manager_id:
+        hr_department.manager_id: __defer__
+
+    hr_job.*:
+    hr_job.__discriminator__:
+        - name
+
+
+resource:
+    resource_resource.*:
+    resource_resource.__discriminator__:
+        - name
+        - code
+    resource_calendar.*:
+    resource_calendar.__discriminator__:
+        - name
+    resource_calendar_leaves.*:
+    resource_calendar_attendance.*:
