@@ -1,6 +1,8 @@
-import xmlrpclib
+import xmlrpc
 import logging
 from os.path import basename
+
+
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(basename(__file__))
 
@@ -357,9 +359,9 @@ def get_socket(username, pwd, dbname, port):
 
     str_common = 'http://localhost:%s/xmlrpc/common' % port
     str_object = 'http://localhost:%s/xmlrpc/object' % port
-    sock_common = xmlrpclib.ServerProxy(str_common)
+    sock_common = xmlrpc.client.ServerProxy(str_common)
     uid = sock_common.login(dbname, username, pwd)
-    sock = xmlrpclib.ServerProxy(str_object)
+    sock = xmlrpc.client.ServerProxy(str_object)
     return sock, uid
 
 

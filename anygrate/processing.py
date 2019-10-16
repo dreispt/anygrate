@@ -388,7 +388,7 @@ class CSVProcessor(object):
                     cursor.execute('UPDATE %s SET (%s)=(%s) WHERE id=%s'
                                    % (table, columns, values, '%s'), tuple(args))
                     cursor.execute('RELEASE SAVEPOINT savepoint; SAVEPOINT savepoint')
-                except Exception, e:
+                except Exception as e:
                     LOG.warn('Error updating table %s:\n%s', table, e.message)
                     cursor = connection.cursor()
                     cursor.execute('ROLLBACK TO savepoint')

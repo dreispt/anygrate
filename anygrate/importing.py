@@ -42,7 +42,7 @@ def import_from_csv(filepaths, connection):
                     cursor.execute(sql)
                     LOG.info('Succesfully imported %s' % basename(filepath))
                     remaining.remove(filepath)
-                except Exception, e:
+                except Exception as e:
                     LOG.warn('Error importing file %s:\n%s',
                              basename(filepath), e.message)
                     cursor = connection.cursor()

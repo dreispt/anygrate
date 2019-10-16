@@ -1,25 +1,34 @@
-# coding: utf-8
 import psycopg2
 import yaml
 import logging
 from os.path import basename
+
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger(basename(__file__))
 
 
 class Mapping(object):
-    """ Stores the mapping and offers a simple API
     """
+    Data structure describing the data source, data target,
+    and the transformations needed.
+    Does not intercat with any database.
+    """
+    # API
+    mapping = {}
+    deferred = {}
+    extract_sql = {}
+    fk2update = {}
 
+    # Internal?
     last_id = 1
     new_id = 1
     target_connection = None
     fk2update = None
 
     def __init__(self, modules, filenames):
-        """ Open the file and compute the mapping
         """
-        self.fk2update = {}
+        Open the files and parse the mapping
+        """
         full_mapping = {}
         # load the full mapping file
         for filename in filenames:
@@ -49,7 +58,9 @@ class Mapping(object):
                 except:
                     raise ValueError('Error in the mapping file: "%s" is invalid here'
                                      % repr(target_columns))
+
         # replace function bodies with real functions
+        self.fk2update = {}
         for incolumn in self.mapping:
             targets = self.mapping[incolumn]
             if targets in (False, '__forget__'):

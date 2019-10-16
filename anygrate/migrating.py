@@ -4,15 +4,16 @@ import psycopg2
 import shutil
 import argparse
 from tempfile import mkdtemp
-from .exporting import export_to_csv, extract_existing
-from .importing import import_from_csv
-from .mapping import Mapping
-from .processing import CSVProcessor
-from .depending import add_related_tables
-from .depending import get_fk_to_update
 import logging
 from os.path import basename, join, abspath, dirname, exists
 from os import listdir
+
+from depending import add_related_tables
+from depending import get_fk_to_update
+from exporting import export_to_csv, extract_existing
+from importing import import_from_csv
+from mapping import Mapping
+from processing import CSVProcessor
 
 HERE = dirname(__file__)
 logging.basicConfig(level=logging.DEBUG)
@@ -63,15 +64,15 @@ def main():
         'ir_model'
     ]
     if args.list:
-        print '\n'.join(listdir(join(HERE, 'mappings')))
+        print('\n'.join(listdir(join(HERE, 'mappings'))))
         sys.exit(0)
 
     if not all([source_db, target_db]):
-        print 'Please provide both -s and -t options'
+        print('Please provide both -s and -t options')
         sys.exit(1)
 
     if args.keepcsv:
-        print "Writing CSV files in the current dir"
+        print("Writing CSV files in the current dir")
 
     tempdir = mkdtemp(prefix=source_db + '-' + str(int(time.time()))[-4:] + '-',
                       dir=abspath('.'))
@@ -163,3 +164,7 @@ def migrate(source_db, target_db, source_tables, mapping_names,
     rate = lines / seconds
     print(u'Migrated %s lines in %s seconds (%s lines/s)'
           % (processor.lines, int(seconds), int(rate)))
+
+
+if __name__ == '__main__':
+    main()
