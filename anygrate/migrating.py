@@ -27,26 +27,26 @@ def main():
     parser.add_argument('-l', '--list',
                         action='store_true',
                         default=False,
-                        help=u'List provided mappings')
+                        help='List provided mappings')
     parser.add_argument('-s', '--source',
                         default='test',
-                        help=u'Source db')
+                        help='Source db')
     parser.add_argument('-t', '--target',
-                        help=u'Target db')
+                        help='Target db')
     parser.add_argument('-k', '--keepcsv',
                         action='store_true',
-                        help=u'Keep csv files in the current directory')
+                        help='Keep csv files in the current directory')
     parser.add_argument('-r', '--relation',
                         nargs='+',
-                        help=u'List of space-separated tables to migrate. '
+                        help='List of space-separated tables to migrate. '
                         'Example : res_partner res_users')
     parser.add_argument('-x', '--excluded',
                         nargs='+',
-                        help=u'List of space-separated tables to exclude'
+                        help='List of space-separated tables to exclude'
                         )
     parser.add_argument('-p', '--path',
                         default='openerp6.1-openerp7.0.yml',
-                        help=u'List of mapping files. '
+                        help='List of mapping files. '
                         'If not found in the specified path, '
                         'each file is searched in the "mappings" dir of this tool. '
                         'Example: openerp6.1-openerp7.0.yml custom.yml',
@@ -54,7 +54,7 @@ def main():
                         )
     parser.add_argument('-w', '--write',
                         action='store_true', default=False,
-                        help=u'Really write to the target database if migration is successful'
+                        help='Really write to the target database if migration is successful'
                         )
 
     args = parser.parse_args()
@@ -105,18 +105,18 @@ def migrate(source_db, target_db, source_tables, mapping_names,
     processor = CSVProcessor(mapping)
 
     # we turn the list of wanted tables into the full list of required tables
-    print(u'Computing the real list of tables to export...')
+    print('Computing the real list of tables to export...')
     source_tables = source_tables or mapping.get_sources()
     source_tables, m2m_tables = add_related_tables(source_connection, source_tables,
                                                    excluded)
-    print(u'The real list of tables to export is: %s' % ', '.join(source_tables))
+    print('The real list of tables to export is: %s' % ', '.join(source_tables))
 
     # Export tables
     print('Exporting tables as CSV files...')
     filepaths = export_to_csv(
         source_tables, target_dir, source_connection, mapping.extract_sql)
-    target_tables = processor.get_target_columns(filepaths).keys()
-    print(u'The real list of tables to import is: %s' % ', '.join(target_tables))
+    target_tables = processor.get_target_columns(filepaths).keys()  # TODO: should be mapping responsibility?
+    print('The real list of tables to import is: %s' % ', '.join(target_tables))
     processor.mapping.update_last_id(source_tables, source_connection,
                                      target_tables, target_connection)
 
@@ -131,38 +131,38 @@ def migrate(source_db, target_db, source_tables, mapping_names,
                                         mapping.discriminators, target_connection)
 
     # create migrated csv files from exported csv files
-    print(u'Migrating CSV files...')
+    print('Migrating CSV files...')
     processor.set_existing_data(existing_records)
     processor.process(target_dir, filepaths, target_dir, target_connection)
 
     # import data in the target
-    print(u'Trying to import data in the target database...')
+    print('Trying to import data in the target database...')
     target_files = [join(target_dir, '%s.target2.csv' % t) for t in target_tables]
     remaining = import_from_csv(target_files, target_connection)
     if remaining:
-        print(u'Please improve the mapping by inspecting the errors above')
+        print('Please improve the mapping by inspecting the errors above')
         sys.exit(1)
 
     # execute deferred updates for preexisting data
-    print(u'Updating pre-existing data...')
+    print('Updating pre-existing data...')
     for table in target_tables:
         filepath = join(target_dir, table + '.update2.csv')
         if not exists(filepath):
-            LOG.warn(u'Not updating %s as it was not imported', table)
+            LOG.warn('Not updating %s as it was not imported', table)
             continue
         processor.update_one(filepath, target_connection)
 
     if write:
         target_connection.commit()
-        print(u'Finished, and transaction committed !! \o/')
+        print('Finished, and transaction committed !! \o/')
     else:
         target_connection.rollback()
-        print(u'Finished \o/ Use --write to really write to the target database')
+        print('Finished \o/ Use --write to really write to the target database')
 
     seconds = time.time() - start_time
     lines = processor.lines
     rate = lines / seconds
-    print(u'Migrated %s lines in %s seconds (%s lines/s)'
+    print('Migrated %s lines in %s seconds (%s lines/s)'
           % (processor.lines, int(seconds), int(rate)))
 
 

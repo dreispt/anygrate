@@ -34,7 +34,7 @@ often achieve overall migration rates over 2000 lines/sec.
 Installation
 ============
 
-This tool only works with **Python 2.7**!
+This tool only works with **Python 3**!
 
 With virtualenv
 ---------------
@@ -125,12 +125,13 @@ Mapping file
 ============
 
 You should keep in mind that this migration tool is only dealing with database
-tables and columns: the OpenERP fields are unknown to it. Each table,
-each line, each cell of the source database is handled independently and the
-mapping file tells what to do with the current cell. This leads to limitations
-and this tool won't be able to handle extremely complex migration.  But it
-is powerful enough to allow to simultaneously merge and migrate two 6.1
-databases into a 7.0 multicompany database.
+tables and columns: the OpenERP/Odoo Models and Fields are unknown to it.
+Each table, each line, each cell of the source database is handled independently
+and the mapping file tells what to do with the current cell.
+This leads to limitations
+and this tool won't be able to handle extremely complex migration.
+But it is powerful enough to allow to simultaneously merge and migrate
+two 6.1 databases into a 7.0 multicompany database.
 
 For a real-life example, you can have a look at the OpenERP 6.1 to 7.0 mapping
 file provided in the ``mappings`` directory of this tool.
@@ -161,7 +162,7 @@ Internally, this statement is actually converted to a Python dict::
         {'table1.column1':
             {'table2.column2': '__copy__'}}
 
-And the whole yml file is converted to a large mapping dict whose leafs are
+The whole yml file is converted to a large mapping dict whose leafs are
 statements or functions which are able to process data.
 
 Copying all columns of a table
@@ -202,7 +203,7 @@ It means: copy all tables to the target database without processing. It may
 seem unuseful compared to a bare dump and restore, but remind that this way you
 can append data to the target DB, not only replace it. In that case you should
 take care of existing data, if the table has constraints (see discriminators
-below)
+below).
 
 Splitting one source line to several tables (table splitting)
 -------------------------------------------------------------
@@ -280,7 +281,7 @@ When input lines must move to a different table, you should use the
 ``__moved__`` statement against its ``id`` column.  It will allow all the
 foreign keys pointing to them to be converted so that they point to the new
 table after migration. This statement is not able to move a column from a table
-to another table. (FIXME: needed for Odoo v7→v8 migration).
+to another table.
 
 The only current situation in OpenERP is for the ``res_partner_address`` data
 moving to the ``res_partner`` table::
@@ -382,6 +383,7 @@ Each ``res_users`` line will generate a new ``res_partner`` line with a new
 *id*, while the ``res_users`` *id* will be the same as the source. (Actually it
 will not be the same, because an offset is applied to all ids).
 
+[TODO FIXME!]
 For very advanced users, the ``self`` variable of the function correspond to
 the CSVProcessor instance, because the function is executed from inside this
 processor by passing self, so you can access all the internal registries of the
@@ -490,6 +492,8 @@ of OpenERP is used (replacing '.' with '_')::
 
 Handle cyclic dependant tables
 ------------------------------
+
+TODO: deprecate __defer__; work around this using ALTER TABLE res_users DISABLE|ENABLE TRIGGER ALL
 
 During the last step, the migrated CSV files are imported one by one.  Some
 tables depend on other tables through foreign key constraints, and such

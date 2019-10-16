@@ -266,7 +266,7 @@ ccu.table_name='%s';""" % table
     # {'table.fkname': 'pointed_table', ...}
     # so that processing each input line is easier
     result = {}
-    for pointed_table, fknames in fk2update.iteritems():
+    for pointed_table, fknames in fk2update.items():
         for fkname in fknames:
             result['.'.join(fkname)] = pointed_table
     return result

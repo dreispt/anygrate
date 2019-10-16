@@ -38,7 +38,7 @@ class CSVProcessor(object):
         for filepath in filepaths:
             source_table = basename(filepath).rsplit('.', 1)[0]
             with open(filepath) as f:
-                source_columns = csv.reader(f).next()
+                source_columns = next(csv.reader(f))
             for source_column in source_columns + ['_']:
                 mapping = self.mapping.get_targets('%s.%s' % (source_table, source_column))
                 # no mapping found, we warn the user
@@ -56,7 +56,7 @@ class CSVProcessor(object):
                         self.target_columns.setdefault(t, set()).add(c)
 
         self.target_columns = {k: sorted([c for c in v if c != '_'])
-                               for k, v in self.target_columns.items()}
+                               for k, v in list(self.target_columns.items())}
         return self.target_columns
 
     def set_existing_data(self, existing_records):
@@ -65,8 +65,8 @@ class CSVProcessor(object):
         self.existing_records = existing_records
         # the same without ids
         self.existing_records_without_id = {
-            table: [{k: str(v) for k, v in nt.iteritems() if k != 'id'} for nt in existing]
-            for table, existing in existing_records.iteritems()
+            table: [{k: str(v) for k, v in nt.items() if k != 'id'} for nt in existing]
+            for table, existing in existing_records.items()
         }
 
     def reorder_with_discriminators(self, tables):
@@ -75,7 +75,7 @@ class CSVProcessor(object):
         """
         # get the list of tables pointed by discriminators
         discriminator_tables = set()
-        for table, columns in self.mapping.discriminators.iteritems():
+        for table, columns in self.mapping.discriminators.items():
             for column in columns:
                 field = table + '.' + column
                 if field in self.fk2update:
@@ -115,12 +115,12 @@ class CSVProcessor(object):
             for table in self.target_columns
         }
         target_files = {
-            table: open(filename, 'ab')
-            for table, filename in target_filenames.items()
+            table: open(filename, 'a')
+            for table, filename in list(target_filenames.items())
         }
         self.writers = {t: csv.DictWriter(f, self.target_columns[t], delimiter=',')
-                        for t, f in target_files.items()}
-        for writer in self.writers.values():
+                        for t, f in list(target_files.items())}
+        for writer in list(self.writers.values()):
             writer.writeheader()
 
         # update filenames and files
@@ -129,14 +129,14 @@ class CSVProcessor(object):
             for table in self.target_columns
         }
         update_files = {
-            table: open(filename, 'ab')
-            for table, filename in update_filenames.items()
+            table: open(filename, 'a')
+            for table, filename in list(update_filenames.items())
         }
         self.updatewriters = {t: csv.DictWriter(f, self.target_columns[t], delimiter=',')
-                              for t, f in update_files.items()}
-        for writer in self.updatewriters.values():
+                              for t, f in list(update_files.items())}
+        for writer in list(self.updatewriters.values()):
             writer.writeheader()
-        LOG.info(u"Processing CSV files...")
+        LOG.info("Processing CSV files...")
         # We should first reorder the processing so that tables pointed to by
         # discriminator values which are fk be processed first. This is not the
         # most common case, but otherwise offsetting these values may fail,
@@ -146,9 +146,9 @@ class CSVProcessor(object):
         for source_filepath in ordered_paths:
             self.process_one(source_filepath, target_connection)
         # close files
-        for target_file in target_files.values():
+        for target_file in list(target_files.values()):
             target_file.close()
-        for update_file in update_files.values():
+        for update_file in list(update_files.values()):
             update_file.close()
 
         # POSTPROCESS target filenames and files
@@ -157,18 +157,18 @@ class CSVProcessor(object):
             for table in self.target_columns
         }
         target2_files = {
-            table: open(filename, 'ab')
-            for table, filename in target2_filenames.items()
+            table: open(filename, 'a')
+            for table, filename in list(target2_filenames.items())
         }
         self.writers = {t: csv.DictWriter(f, self.target_columns[t], delimiter=',')
-                        for t, f in target2_files.items()}
-        for writer in self.writers.values():
+                        for t, f in list(target2_files.items())}
+        for writer in list(self.writers.values()):
             writer.writeheader()
-        LOG.info(u"Postprocessing CSV files...")
-        for filename in target_filenames.values():
+        LOG.info("Postprocessing CSV files...")
+        for filename in list(target_filenames.values()):
             filepath = join(target_dir, filename)
             self.postprocess_one(filepath)
-        for f in target2_files.values():
+        for f in list(target2_files.values()):
             f.close()
 
         # POSTPROCESS update filenames and files
@@ -177,28 +177,28 @@ class CSVProcessor(object):
             for table in self.target_columns
         }
         update2_files = {
-            table: open(filename, 'ab')
-            for table, filename in update2_filenames.items()
+            table: open(filename, 'a')
+            for table, filename in list(update2_filenames.items())
         }
         self.writers = {t: csv.DictWriter(f, self.target_columns[t], delimiter=',')
-                        for t, f in update2_files.items()}
-        for writer in self.writers.values():
+                        for t, f in list(update2_files.items())}
+        for writer in list(self.writers.values()):
             writer.writeheader()
-        for filename in update_filenames.values():
+        for filename in list(update_filenames.values()):
             filepath = join(target_dir, filename)
             self.postprocess_one(filepath)
         # close files
-        for f in update2_files.values():
+        for f in list(update2_files.values()):
             f.close()
         # display summay statistics
-        print("-"*24 + "\tins\tupd\tpostprocess")
-        for table, stats in self.stats.items():
+        print(("-"*24 + "\tins\tupd\tpostprocess"))
+        for table, stats in list(self.stats.items()):
             data = {'table': table.rjust(24, ' '),
                     'ins': 0, 'upd': 0,
                     'postprocess': 0}
             data.update(stats or {})
-            print("%(table)s\t%(ins)d\t%(upd)d\t%(postprocess)d" % data)
-        print("-"*24)
+            print(("%(table)s\t%(ins)d\t%(upd)d\t%(postprocess)d" % data))
+        print(("-"*24))
 
     def process_one(self, source_filepath,
                     target_connection=None):
@@ -207,7 +207,7 @@ class CSVProcessor(object):
         Because the processing order is not determined (unordered dicts)
         """
         source_table = basename(source_filepath).rsplit('.', 1)[0]
-        with open(source_filepath, 'rb') as source_csv:
+        with open(source_filepath, 'r') as source_csv:
             reader = csv.DictReader(source_csv, delimiter=',')
             stats = {'ins': 0, 'upd': 0}
             # process each csv line
@@ -221,7 +221,7 @@ class CSVProcessor(object):
                     if mapping is None:
                         continue
                     # we found a mapping, use it
-                    for target_record, function in mapping.items():
+                    for target_record, function in list(mapping.items()):
                         target_table, target_column = target_record.split('.')
                         target_rows.setdefault(target_table, {})
                         if target_column == '_':
@@ -253,7 +253,7 @@ class CSVProcessor(object):
                             target_rows[target_table][target_column] = result
 
                 # offset all ids except existing data and choose to write now or update later
-                for table, target_row in target_rows.items():
+                for table, target_row in list(target_rows.items()):
                     if not any(target_row.values()):
                         continue
                     discriminators = self.mapping.discriminators.get(table)
@@ -264,7 +264,7 @@ class CSVProcessor(object):
                     discriminator_values = {d: target_row[d] for d in (discriminators or [])}
                     # before matching existing, we should fix the discriminator_values which are fk
                     # FIXME refactor and merge with the code in postprocess
-                    for key, value in discriminator_values.items():
+                    for key, value in list(discriminator_values.items()):
                         fk_table = self.fk2update.get(table + '.' + key)
                         if value and fk_table:
                             value = int(value)
@@ -280,7 +280,7 @@ class CSVProcessor(object):
                         # find the id of the existing record in the target
                         for i, nt in enumerate(existing):
                             if discriminator_values == {k: str(v)
-                                                        for k, v in nt.iteritems() if k != 'id'}:
+                                                        for k, v in nt.items() if k != 'id'}:
                                 existing_id = existing[i]['id']
                                 break
                         self.fk_mapping.setdefault(table, {})
@@ -303,7 +303,7 @@ class CSVProcessor(object):
                             target_row['id'] = int(target_row['id']) + self.mapping.last_id
                             # handle deferred records
                             if table in self.mapping.deferred:
-                                upd_row = {k: v for k, v in target_row.iteritems()
+                                upd_row = {k: v for k, v in target_row.items()
                                            if k == 'id'
                                            or (k in self.mapping.deferred[table] and v != '')}
                                 if len(upd_row) > 1:
@@ -327,13 +327,13 @@ class CSVProcessor(object):
         """ Postprocess one target csv file
         """
         table = basename(target_filepath).rsplit('.', 2)[0]
-        with open(target_filepath, 'rb') as target_csv:
+        with open(target_filepath, 'r') as target_csv:
             reader = csv.DictReader(target_csv, delimiter=',')
             stats = {'postprocess': 0}
             for target_row in reader:
                 postprocessed_row = {}
                 # fix the foreign keys of the line
-                for key, value in target_row.items():
+                for key, value in list(target_row.items()):
                     target_record = table + '.' + key
                     postprocessed_row[key] = value
                     fk_table = self.fk2update.get(target_record)
@@ -375,12 +375,12 @@ class CSVProcessor(object):
         """
         table = basename(filepath).rsplit('.', 2)[0]
         has_data = False
-        with open(filepath, 'rb') as update_csv:
+        with open(filepath, 'r') as update_csv:
             cursor = connection.cursor()
             reader = csv.DictReader(update_csv, delimiter=',')
             for update_row in reader:
                 has_data = True
-                items = [(k, v) for k, v in update_row.iteritems() if v != '']
+                items = [(k, v) for k, v in update_row.items() if v != '']
                 columns = ', '.join([i[0] for i in items])
                 values = ', '.join(['%s' for i in items])
                 args = [i[1] for i in items] + [update_row['id']]
@@ -389,12 +389,12 @@ class CSVProcessor(object):
                                    % (table, columns, values, '%s'), tuple(args))
                     cursor.execute('RELEASE SAVEPOINT savepoint; SAVEPOINT savepoint')
                 except Exception as e:
-                    LOG.warn('Error updating table %s:\n%s', table, e.message)
+                    LOG.warn('Error updating table %s:\n%s', table, str(e))
                     cursor = connection.cursor()
                     cursor.execute('ROLLBACK TO savepoint')
                     cursor.close()
                     break
             if has_data:
-                LOG.info(u'Successfully updated table %s', table)
+                LOG.info('Successfully updated table %s', table)
             else:
-                LOG.info(u'Nothing to update in table %s', table)
+                LOG.info('Nothing to update in table %s', table)

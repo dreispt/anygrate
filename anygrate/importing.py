@@ -16,18 +16,18 @@ def import_from_csv(filepaths, connection):
     cursor.execute('SAVEPOINT savepoint')
     cursor.close()
     while len(remaining) > 0:
-        LOG.info(u'==== BRUTE FORCE LOOP ====')
+        LOG.info('==== BRUTE FORCE LOOP ====')
         table_list = [x.split('/')[-1].split('.')[0] for x in remaining]
-        LOG.debug(u"Remaining:\n%s" % '\t'.join(table_list))
+        LOG.debug("Remaining:\n%s" % '\t'.join(table_list))
 
         paths = list(remaining)
         for filepath in paths:
             if not exists(filepath):
-                LOG.warn(u'Missing CSV for table %s', filepath.rsplit('.', 2)[0])
+                LOG.warn('Missing CSV for table %s', filepath.rsplit('.', 2)[0])
                 continue
             with open(filepath) as f:
                 table = basename(filepath).rsplit('.', 2)[0]
-                columns = ','.join(['"%s"' % c for c in csv.reader(f).next()])
+                columns = ','.join(['"%s"' % c for c in next(csv.reader(f))])
                 f.seek(0)
                 copy = ("COPY %s (%s) FROM STDOUT WITH CSV HEADER NULL ''"
                         % (table, columns))
@@ -35,16 +35,17 @@ def import_from_csv(filepaths, connection):
                     cursor = connection.cursor()
                     cursor.copy_expert(copy, f)
                     if '"id"' in columns.split(','):
-                        sql = "SELECT setval('%s_id_seq', max(id)) FROM %s" % (
-                            table, table)
-                        cursor.execute(sql)
+                        sql = "SELECT setval('%s_id_seq', max(id)) FROM %s"
+                        cursor.execute(sql, table, table)
                     sql = 'RELEASE SAVEPOINT savepoint; SAVEPOINT savepoint'
                     cursor.execute(sql)
                     LOG.info('Succesfully imported %s' % basename(filepath))
                     remaining.remove(filepath)
                 except Exception as e:
-                    LOG.warn('Error importing file %s:\n%s',
-                             basename(filepath), e.message)
+                    LOG.warn(
+                        'Error importing file %s:\n%s',
+                        basename(filepath), str(e)
+                    )
                     cursor = connection.cursor()
                     cursor.execute('ROLLBACK TO savepoint')
                     cursor.close()
