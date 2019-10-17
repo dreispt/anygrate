@@ -40,9 +40,6 @@ def add_related_tables(target_connection, tables, excluded_tables):
                     new_deps.add(table)
                     all_deps.setdefault(table, set())
                     all_deps[table].add(parent)
-            #print("\n", tables, "\n", excluded_tables)
-            #from pprint import pprint; pprint(all_deps)
-            #print(new_deps)
             all_deps = _get_fk_dependencies_dict(
                 cursor, new_deps, excluded_tables, all_deps)
         return all_deps
@@ -76,7 +73,7 @@ def add_related_tables(target_connection, tables, excluded_tables):
             cursor, tables, excluded_tables).keys()
         m2m_tables = _get_m2m_dependencies_set(
             cursor, tables, excluded_tables)
-    return model_tables | m2m_tables, m2m_tables
+    return model_tables, m2m_tables
 
 
 def get_fk_to_update(connection, tables):

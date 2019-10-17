@@ -111,12 +111,13 @@ def migrate(source_db, target_db, source_tables, mapping_names,
         source_connection,
         source_tables,
         excluded)
-    print('The real list of tables to export is: %s' % ', '.join(real_source_tables))
+    all_source_tables = real_source_tables | m2m_tables
+    print('The real list of tables to export is: %s' % ', '.join(all_source_tables))
 
     # Export tables
     print('Exporting tables as CSV files...')
     filepaths = export_to_csv(
-        real_source_tables, target_dir, source_connection, mapping.extract_sql)
+        all_source_tables, target_dir, source_connection, mapping.extract_sql)
     target_tables = processor.get_target_columns(filepaths).keys()  # TODO: should be mapping responsibility?
     print('The real list of tables to import is: %s' % ', '.join(target_tables))
     processor.mapping.update_last_id(real_source_tables, source_connection,
