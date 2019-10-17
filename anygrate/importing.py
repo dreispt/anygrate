@@ -35,8 +35,8 @@ def import_from_csv(filepaths, connection):
                     cursor = connection.cursor()
                     cursor.copy_expert(copy, f)
                     if '"id"' in columns.split(','):
-                        sql = "SELECT setval('%s_id_seq', max(id)) FROM %s"
-                        cursor.execute(sql, table, table)
+                        sql = "SELECT setval('%s_id_seq', max(id)) FROM %s" % (table, table)
+                        cursor.execute(sql)
                     sql = 'RELEASE SAVEPOINT savepoint; SAVEPOINT savepoint'
                     cursor.execute(sql)
                     LOG.info('Succesfully imported %s' % basename(filepath))
