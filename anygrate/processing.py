@@ -242,11 +242,13 @@ class CSVProcessor(object):
                         # This can happen in case of semantic change like res.partner.address
                         elif function == '__moved__':
                             self.is_moved.add(source_table)
-                            newid = self.mapping.newid()
+                            oldid = int(source_row[source_column])
+                            newid = self.mapping.newid(target_table)
                             target_rows[target_table][target_column] = newid
                             self.fk_mapping.setdefault(source_table, {})
-                            self.fk_mapping[source_table][int(source_row[source_column])] \
-                                = newid + self.mapping.last_id
+                            #self.fk_mapping[source_table][int(source_row[source_column])] \
+                            #    = newid + self.mapping.last_id
+                            self.fk_mapping[source_table][oldid] = newid
                         else:
                             # mapping is supposed to be a function
                             result = function(self, source_row, target_rows)
@@ -300,7 +302,9 @@ class CSVProcessor(object):
                     else:
                         # offset the id of the line, except for m2m (no id)
                         if 'id' in target_row:
-                            target_row['id'] = int(target_row['id']) + self.mapping.last_id
+                            #CHANGED: use newid
+                            #target_row['id'] = int(target_row['id']) + self.mapping.last_id
+                            target_row['id'] = self.mapping.newid(table)
                             # handle deferred records
                             if table in self.mapping.deferred:
                                 upd_row = {k: v for k, v in target_row.items()
@@ -342,8 +346,10 @@ class CSVProcessor(object):
                         # if the target record is an existing record it should be in the fk_mapping
                         # so we restore the real target id, or offset it if not found
                         value = int(value)
+                        #postprocessed_row[key] = self.fk_mapping.get(fk_table, {}).get(
+                        #    value, value + self.mapping.last_id)
                         postprocessed_row[key] = self.fk_mapping.get(fk_table, {}).get(
-                            value, value + self.mapping.last_id)
+                            value, self.mapping.newid(table))
                     # if we're postprocessing an update we should restore the id as well
                     if key == 'id' and table in self.fk_mapping:
                         value = int(value)
@@ -355,8 +361,10 @@ class CSVProcessor(object):
                         ref_table = target_row[ref_column].replace('.', '_')
                         # TODO: some models with __ref__ should skip rows where
                         #       the related row does not exist
+                        #postprocessed_row[key] = self.fk_mapping.get(ref_table, {}).get(
+                        #    value, value + self.mapping.last_id)
                         postprocessed_row[key] = self.fk_mapping.get(ref_table, {}).get(
-                            value, value + self.mapping.last_id)
+                            value, self.mapping.newid(table))
                 # don't write m2m lines if they exist in the target
                 # FIXME: refactor these 4 lines with those from process_one()?
                 discriminators = self.mapping.discriminators.get(table)

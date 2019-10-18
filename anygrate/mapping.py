@@ -20,8 +20,9 @@ class Mapping(object):
     fk2update = {}
 
     # Internal?
-    last_id = 1
-    new_id = 1
+    #last_id = 1
+    #new_id = 1
+    last_ids = {}
     target_connection = None
     fk2update = None
 
@@ -97,7 +98,7 @@ class Mapping(object):
                 mapping_function = None
                 exec(compile(function_body, '<' + incolumn + ' → ' + outcolumn + '>', 'exec'),
                      globals().update({
-                         'newid': self.newid,
+                         'newid': lambda: self.newid(table),
                          'sql': self.sql}))
                 self.mapping[incolumn][outcolumn] = mapping_function
                 del mapping_function
@@ -115,12 +116,18 @@ class Mapping(object):
                 for key, value in mapping.items()
                 if '__query__' in key})
 
-    def newid(self):
+    def get_last_id(self, table):
+        return self.last_ids.get(table, 0)
+
+    def newid(self, table):
         """ increment the global stored last_id
         This method is available as a function in the mapping
         """
-        self.new_id += 1
-        return self.new_id
+        self.last_ids.setdefault(table, 0)
+        self.last_ids[table] += 1
+        #self.new_id += 1
+        #return self.new_id
+        return self.last_ids[table]
 
     def sql(self, db, sql, args=()):
         """ execute an sql statement in the target db and return the value
@@ -183,7 +190,9 @@ class Mapping(object):
                 try:
                     c.execute('select max(id) from %s' % source_table)
                     maxid = c.fetchone()
-                    self.last_id = max(maxid and maxid[0] or 1, self.last_id)
+                    self.last_ids[source_table] = max(
+                        maxid and maxid[0] or 0,
+                        self.last_ids.get(source_table, 0))
                 except psycopg2.ProgrammingError:
                     # id column does not exist
                     source_connection.rollback()
@@ -193,8 +202,10 @@ class Mapping(object):
                 try:
                     c.execute('select max(id) from %s' % target_table)
                     maxid = c.fetchone()
-                    self.last_id = max(maxid and maxid[0] or 1, self.last_id)
+                    self.last_ids[target_table] = max(
+                        maxid and maxid[0] or 0,
+                        self.last_ids.get(target_table, 0))
                 except psycopg2.ProgrammingError:
                     # id column does not exist
                     target_connection.rollback()
-        self.new_id = 10 * self.last_id  # FIXME 10 is arbitrary but should be enough
+        #self.new_id = 10 * self.last_id  # FIXME 10 is arbitrary but should be enough
