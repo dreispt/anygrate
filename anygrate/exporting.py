@@ -41,11 +41,15 @@ def extract_existing(tables, m2m_tables, discriminators, connection):
     result = {}
     for table in tables:
         result[table] = []
-        with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-            if table not in discriminators:
-                continue
-            columns = discriminators[table]
-            id_column = ['id'] if table not in m2m_tables else []
-            cursor.execute('select %s from %s' % (', '.join(columns + id_column), table))
-            result[table] = cursor.fetchall()
+        columns = None
+        if discriminators.get(table):
+            columns = ', '.join(discriminators[table]) + ', id'
+        elif table in m2m_tables:
+            columns = '*'  # Note: no actual id value in this case!
+        if columns:
+            with connection.cursor(
+                    cursor_factory=psycopg2.extras.DictCursor) as cursor:
+                cursor.execute('select %s from %s' % (columns, table))
+                data = cursor.fetchall()
+            result[table] = data
     return result
