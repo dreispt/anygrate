@@ -14,8 +14,6 @@ def add_related_tables(target_connection, tables, excluded_tables):
 
     - Find all FK dependant tables 
     - recursively navigate FKs to expand the list of tables
-    - 
-
     """
     def _get_fk_dependencies_dict(cursor, tables, excluded_tables,
                                   all_deps=None):
@@ -79,31 +77,26 @@ def add_related_tables(target_connection, tables, excluded_tables):
 def get_fk_to_update(connection, tables):
     """ Method to get back all columns referencing another table
     """
-    fk2update = {}
-    with connection.cursor() as c:
-        for table in tables:
-            if table not in fk2update:
-                if table == 'ir.actions':
-                    table = 'ir.actions.actions'
-                query = """
-SELECT tc.table_name, kcu.column_name
-FROM information_schema.table_constraints AS tc JOIN
-information_schema.key_column_usage AS kcu ON
-tc.constraint_name = kcu.constraint_name JOIN
-information_schema.constraint_column_usage AS
-ccu ON ccu.constraint_name = tc.constraint_name
-WHERE constraint_type = 'FOREIGN KEY' AND
-ccu.table_name='%s';""" % table
-                c.execute(query)
-                results = c.fetchall()
-                fk2update[table] = results
-    # transpose the result to obtain:
-    # {'table.fkname': 'pointed_table', ...}
-    # so that processing each input line is easier
-    result = {}
-    for pointed_table, fknames in fk2update.items():
-        for fkname in fknames:
-            result['.'.join(fkname)] = pointed_table
+    # ccu = referenced table and key (ex: res_company.id)
+    # |_ tc = FK constraint and referencing table
+    #    |_ kcu = FK columns referencing a key (ex: res_company.parent_id)
+    query = """
+    SELECT kcu.table_name, kcu.column_name, ccu.table_name as referenced
+    FROM information_schema.table_constraints AS tc
+    JOIN information_schema.key_column_usage AS kcu
+      ON tc.constraint_name = kcu.constraint_name
+    JOIN information_schema.constraint_column_usage AS ccu
+      ON ccu.constraint_name = tc.constraint_name
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND tc.table_schema = 'public'
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        data = cursor.fetchall()
+        result = {
+            row[0] + '.' + row[1]: row[2]
+            for row in data
+        }
     return result
 
 
