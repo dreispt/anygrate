@@ -24,33 +24,39 @@ base:
     #ir_mail_server.__discriminator__:
     #    - name
 
-    # TODO Check multicpmpany properties
-    # TODO make FKs work for reference fields (res_id)
-    ir_property.*:
+    # Required by ir_property, to perfom a Lookup on field ids
+    # but not expected to import data
+    # TODO: allow this ID lookup without having to declare the table here
+    ir_model_fields.*:
+    ir_model_fields.__discriminator__:
+        - name
+        - model
 
-    # TODO: load attachment references properly
-    #ir_attachment.*:
-    #ir_attachment.res_id:
-    #    ir_attachment.res_id: __ref__ res_model
+    # TODO Check multicpmpany properties
+    # TODO make FKs work for reference fields (res_id and value_reference)
+    ir_property.*:
+    ir_property.res_id:
+        ir_property.res_id: __ref__
+    ir_property.value_reference:
+        ir_property.value_reference: __ref__
+
+    # TODO: check load attachment references properly
+    ir_attachment.*:
+    ir_attachment.res_id:
+        ir_attachment.res_id: __ref__ res_model
 
     res_partner_title.*:
-    #res_partner_title.__discriminator__:
-    #    - name
+    res_partner_title.__discriminator__:
+        - name
 
     # Chances we dont need to sync this
     # res_country.*:
-    # res_country.create_uid:
-    #     res_country.create_uid: __defer__
     # res_country.__discriminator__:
     #     - code
 
-    # res_country_state.*:
-    # res_country_state.write_uid:
-    #     res_country_state.write_uid: __defer__
-    # res_country_state.create_uid:
-    #     res_country_state.create_uid: __defer__
-    # res_country_state.__discriminator__:
-    #     - code
+    res_country_state.*:
+    res_country_state.__discriminator__:
+        - code
 
     res_currency.*:
     res_currency.__discriminator__:
@@ -89,11 +95,10 @@ base:
 
     #res_company_users_rel.*:
 
-    # TODO: ensure that discriminators on FKs work!
     res_partner_bank.*:
     res_partner_bank.__discriminator__:
-        - partner_id
-        - bank_id
+        - sanitized_acc_number
+        - company_id
 
     res_bank.*:
     res_bank.__discriminator__:
@@ -102,3 +107,87 @@ base:
     res_partner_category.*:
     res_partner_category.__discriminator__:
         - name
+
+product:
+    uom_uom.*:
+    uom_uom.__discriminator__:
+        - name
+    uom_category.*:
+    uom_category.__discriminator__:
+        - name
+
+    product_category.*:
+    product_category.__discriminator__:
+        - name
+        - parent_id
+
+    product_packaging.*:
+    product_packaging.__discriminator__:
+        - name
+
+    product_template.*:
+    product_template.__discriminator__:
+        - name
+
+    product_attribute.*:
+    product_attribute.__discriminator__:
+        - name
+
+    product_template_attribute_line.*:
+    product_template_attribute_line.__discriminator__:
+        - product_tmpl_id
+        - attribute_id
+
+    product_template_attribute_value.*:
+    product_template_attribute_value.__discriminator__:
+        - product_tmpl_id
+        - product_attribute_value_id
+
+    product_template_attribute_exclusion.*:
+    product_template_attribute_exclusion.__discriminator__:
+        - product_tmpl_id
+        - product_template_attribute_value_id
+
+    product_product.*:
+    product_product.__discriminator__:
+        - product_tmpl_id
+        - default_code
+        - barcode
+
+    product_supplierinfo.*:
+    product_supplierinfo.__discriminator__:
+        - name
+        - product_tmpl_id
+        - product_id
+
+    product_pricelist.*:
+    product_pricelist.__discriminator__:
+        - name
+
+    product_pricelist_item.*:
+    product_pricelist_item.__discriminator__:
+        - product_tmpl_id
+        - product_id
+
+    product_price_history.*:
+    product_price_history.__discriminator__:
+        - product_id
+        - datetime
+
+# Modules with nothing to do - hide warnings
+sms:
+snail_mail:
+snail_mail_account:
+web:
+web_cohort:
+web_dashboard:
+web_diagram:
+web_editor:
+web_enterprise:
+web_gantt:
+web_grid:
+web_kanban_gauge:
+web_mobile:
+web_settings_dasboard:
+web_tour:
+web_unsplash:
