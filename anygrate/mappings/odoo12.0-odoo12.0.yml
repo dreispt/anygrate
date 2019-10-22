@@ -1,0 +1,104 @@
+base:
+
+    # TODO: ensure Sequences are correct
+    #ir_sequence.*:
+    #ir_sequence.number_next:
+    #    ir_sequence.number_next: |
+    #        # don't conflict with the next statement (could be avoided with ordereddict)
+    #         return target_rows['ir_sequence'].get('number_next', source_row['number_next'])
+    #ir_sequence.id:
+    #    ir_sequence.id: |
+    #        # we don't merge sequences, it's too painful
+    #        sequence_name = 'ir_sequence_' + source_row['id'].zfill(3)
+    #        sequence_exists = sql('source', 'select * from pg_class where relname=(%s)', (sequence_name,))
+    #        if sequence_exists:
+    #            last_value = sql('source', 'select last_value from %s' % sequence_name)[0][0]
+    #            target_rows['ir_sequence']['number_next'] = last_value + 1
+    #            sequence_id = int(source_row['id']) + self.mapping.last_id
+    #            sql('target',
+    #                "create sequence ir_sequence_%03d increment by %%s start with %%s" % sequence_id,
+    #                (int(source_row['number_increment']), last_value))
+    #        return source_row['id']
+
+    #ir_mail_server.*:
+    #ir_mail_server.__discriminator__:
+    #    - name
+
+    # TODO Check multicpmpany properties
+    # TODO make FKs work for reference fields (res_id)
+    ir_property.*:
+
+    # TODO: load attachment references properly
+    #ir_attachment.*:
+    #ir_attachment.res_id:
+    #    ir_attachment.res_id: __ref__ res_model
+
+    res_partner_title.*:
+    #res_partner_title.__discriminator__:
+    #    - name
+
+    # Chances we dont need to sync this
+    # res_country.*:
+    # res_country.create_uid:
+    #     res_country.create_uid: __defer__
+    # res_country.__discriminator__:
+    #     - code
+
+    # res_country_state.*:
+    # res_country_state.write_uid:
+    #     res_country_state.write_uid: __defer__
+    # res_country_state.create_uid:
+    #     res_country_state.create_uid: __defer__
+    # res_country_state.__discriminator__:
+    #     - code
+
+    res_currency.*:
+    res_currency.__discriminator__:
+        - name
+
+    # Company data
+    res_company.id:
+    res_company.name:
+    res_company.partner_id:
+    res_company.currency_id:
+    res_company.fiscalyear_last_day:
+    res_company.fiscalyear_last_month:
+    res_company.account_check_printing_layout:
+    res_company.*:
+    res_company.__discriminator__:
+        - name
+
+    # Users
+    res_users.id:
+    res_users.name:
+    res_users.login:
+    res_users.partner_id:
+    res_users.*:
+    res_users.__discriminator__:
+        - login
+    res_users.sale_team_id: __forget__
+
+    # Partners
+    res_partner.id:
+    res_partner.name:
+    res_partner.parent_id:
+    res_partner.commercial_partner_id:
+    res_partner.*:
+    res_partner.__discriminator__:
+        - name
+
+    #res_company_users_rel.*:
+
+    # TODO: ensure that discriminators on FKs work!
+    res_partner_bank.*:
+    res_partner_bank.__discriminator__:
+        - partner_id
+        - bank_id
+
+    res_bank.*:
+    res_bank.__discriminator__:
+        - name
+
+    res_partner_category.*:
+    res_partner_category.__discriminator__:
+        - name
