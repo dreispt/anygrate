@@ -33,10 +33,12 @@ def import_from_csv(filepaths, connection):
                         % (table, columns))
                 try:
                     cursor = connection.cursor()
+                    cursor.execute("ALTER TABLE %s DISABLE TRIGGER ALL" % table)
                     cursor.copy_expert(copy, f)
                     if '"id"' in columns.split(','):
                         sql = "SELECT setval('%s_id_seq', max(id)) FROM %s" % (table, table)
                         cursor.execute(sql)
+                    cursor.execute("ALTER TABLE %s ENABLE TRIGGER ALL" % table)
                     sql = 'RELEASE SAVEPOINT savepoint; SAVEPOINT savepoint'
                     cursor.execute(sql)
                     LOG.info('Succesfully imported %s' % basename(filepath))
@@ -48,6 +50,7 @@ def import_from_csv(filepaths, connection):
                     )
                     cursor = connection.cursor()
                     cursor.execute('ROLLBACK TO savepoint')
+                    cursor.execute("ALTER TABLE %s ENABLE TRIGGER ALL" % table)
                     cursor.close()
         if len(paths) == len(remaining):
             LOG.error('\n\n***\n* Could not import remaining tables : %s :-( \n***\n'
