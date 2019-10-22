@@ -3,6 +3,8 @@ import logging
 import os
 from os.path import basename, join, splitext
 
+import foreignkey
+
 HERE = os.path.dirname(__file__)
 logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger(basename(__file__))
@@ -106,8 +108,6 @@ class CSVProcessor(object):
         filepaths = [join(source_dir, source_filename) for source_filename in source_filenames]
         source_tables = [splitext(basename(path))[0] for path in filepaths]
         self.target_columns = self.get_target_columns(filepaths)
-        # load discriminator values for target tables
-        # TODO
 
         # filenames and files
         target_filenames = {
@@ -137,11 +137,20 @@ class CSVProcessor(object):
         for writer in list(self.updatewriters.values()):
             writer.writeheader()
         LOG.info("Processing CSV files...")
+
+        # load discriminator values for target tables
+        # TODO
+        self.KeyMap = foreignkey.DatabaseKeyMap(
+            source_tables,
+            self.mapping.discriminators,
+            target_connection
+        )
+
         # We should first reorder the processing so that tables pointed to by
         # discriminator values which are fk be processed first. This is not the
         # most common case, but otherwise offsetting these values may fail,
         # leading to unwanted matching and unwanted merge.
-        ordered_tables = self.reorder_with_discriminators(source_tables)
+        ordered_tables = source_tables  #DR, Buggy: self.reorder_with_discriminators(source_tables)
         ordered_paths = [join(source_dir, table + '.csv') for table in ordered_tables]
         for source_filepath in ordered_paths:
             self.process_one(source_filepath, target_connection)
@@ -259,6 +268,32 @@ class CSVProcessor(object):
                     if not any(target_row.values()):
                         continue
                     discriminators = self.mapping.discriminators.get(table)
+
+                    # Refactor using KeyMap object
+                    old_id = target_row['id']
+                    new_id = None
+                    if discriminators and 'id' in target_row:
+                        discriminator_value = tuple(
+                            target_row[x] for x in discriminators)
+                        new_id = self.KeyMap.assign_existing_id(
+                            old_id, source_table, table, discriminator_value)
+                    if new_id:
+                        continue  # dont load records already on target
+                        # TODO ROADMAP: allow to wverwrite target database records
+                        # mapping = source
+                        # target_row['id'] = new_id
+                        # self.updatewriters[table].writerow(target_row)
+                        # stats['upd'] += 1
+                    else:
+                        new_id = self.KeyMap.assign_new_id(
+                            old_id, source_table, table)
+                    target_row['id'] = new_id
+                    print('INS', table, 'PK', new_id, '->', target_row)
+                    self.writers[table].writerow(target_row)
+                    stats['ins'] += 1
+                    continue
+                    # Deprecated
+
                     # if the line exists in the target db, we don't offset and write to update file
                     # (we recognize by matching the dict of discriminator values against existing)
                     existing = self.existing_records.get(table, [])
@@ -275,6 +310,7 @@ class CSVProcessor(object):
                                 discriminator_values[key] = str(
                                     self.fk_mapping[fk_table].get(value, value))
                     # save the mapping between source id and existing id
+                    # in: self.fk_mapping[table][source_id] = target_id
                     if (discriminators
                             and 'id' in target_row
                             and all(discriminator_values.values())
@@ -323,11 +359,47 @@ class CSVProcessor(object):
                         # otherwise write the target csv line
                         self.writers[table].writerow(target_row)
                         stats['ins'] += 1
+
+                #if table == 'res_partner':
+                #    x = target_rows[table]
+                #    print(x['id'], x['name'], x['commercial_partner_id'])
             self.stats[source_table] = stats
             LOG.debug("Processed %s:\t\t%d ins\t%d upd"
                       % (source_table, stats['ins'], stats['upd']))
 
     def postprocess_one(self, target_filepath):
+        """ Postprocess one target csv file to remap foreig keys """
+        table = basename(target_filepath).rsplit('.', 2)[0]
+        #import pudb; pu.db
+        with open(target_filepath, 'r') as target_csv:
+            reader = csv.DictReader(target_csv, delimiter=',')
+            stats = {'postprocess': 0}
+            for target_row in reader:
+                postprocessed_row = {}
+                # fix the foreign keys of the line
+                for key, value in list(target_row.items()):
+                    target_record = table + '.' + key
+                    postprocessed_row[key] = value
+                    fk_table = self.fk2update.get(target_record)
+                    # if this is a fk, fix it
+                    if value and fk_table:
+                        # Refactor using KeyMap object
+                        postprocessed_row[key] = self.KeyMap.get_id(value, fk_table)
+                        stats['postprocess'] += 1
+                    # manage __ref__
+                    elif value and target_record in self.ref_mapping:
+                        # first find the target table of the reference
+                        fk_table, fk_key = value.split(',')
+                        fk_id = self.KeyMap.get_id(fk_key, fk_table.replace('.', '_'))
+                        postprocessed_row[key] = fk_table + '.' + fk_id
+                        stats['postprocess'] += 1
+                self.writers[table].writerow(postprocessed_row)
+                print('FK', table, postprocessed_row)
+            self.stats.setdefault(table, {}).update(stats)
+            LOG.debug(
+                "Postprocessing %s:\t\t%d rows" % (table, stats['postprocess']))
+
+    def OLD_postprocess_one(self, target_filepath):
         """ Postprocess one target csv file
         """
         table = basename(target_filepath).rsplit('.', 2)[0]
