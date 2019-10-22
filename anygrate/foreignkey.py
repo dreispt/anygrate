@@ -61,7 +61,11 @@ class DatabaseKeyMap(object):
                 "select id, %s from %s" %
                 (discriminator_columns, target_table))
             data = c.fetchall()
-        existing_discriminators = {tuple(row[1:]): row[0] for row in data}
+        existing_discriminators = {}
+        for row in data:
+            key = tuple(str(x) for x in row[1:])
+            value = row[0]
+            existing_discriminators[key] = value
         self._existing_discriminators[target_table] = existing_discriminators
         return existing_discriminators
 
@@ -77,7 +81,7 @@ class DatabaseKeyMap(object):
             has_id = int(c.fetchone()[0])
             if has_id:
                 c.execute("select max(id) from %s" % target_table)
-                result = int(c.fetchone()[0])
+                result = int(c.fetchone()[0] or 0)
         self._last_ids[target_table] = result
         return result
 
