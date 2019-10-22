@@ -154,14 +154,19 @@ class Mapping(object):
                 partial_pattern = '%s.*' % table
                 if partial_pattern in self.mapping:
                     if self.mapping[partial_pattern]:
-                        return {k.replace('*', column): v
-                                for k, v in self.mapping[partial_pattern].items()}
+                        return {
+                            k.replace('*', column): v
+                            for k, v in self.mapping[partial_pattern].items()}
                     return {source: None}
+            elif not mapping:  # key found, but with empty value
+                return {source: None}
             return mapping
 
         else:  # asked for a table
             self.target_tables = set()
-            target_fields = [t[1] for t in self.mapping.items() if t[0].split('.')[0] == source]
+            target_fields = [
+                t[1] for t in self.mapping.items()
+                if t[0].split('.')[0] == source]
             for f in target_fields:
                 self.target_tables.update([c.split('.')[0] for c in f.keys()])
             self.target_tables = list(self.target_tables)
