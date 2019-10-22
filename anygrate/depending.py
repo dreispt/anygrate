@@ -13,7 +13,7 @@ def add_related_tables(target_connection, tables, excluded_tables):
     Also look for m2m relation tables involving all the selected tables.
 
     - Find all FK dependant tables 
-    - recursively navigate FKs to expand the list of tables
+    - TODO: recursively navigate FKs to expand the list of tables
     """
     def _get_fk_dependencies_dict(cursor, tables, excluded_tables,
                                   all_deps=None):
@@ -21,30 +21,32 @@ def add_related_tables(target_connection, tables, excluded_tables):
         if tables:
             excluded_tables = excluded_tables or []
             cursor.execute("""
-                SELECT ccu.table_name, tc.table_name parent
+                SELECT DISTINCT ccu.table_name, tc.table_name parent
                 FROM information_schema.table_constraints AS tc
                   JOIN information_schema.constraint_column_usage AS ccu
                     ON ccu.constraint_name = tc.constraint_name
                 WHERE constraint_type = 'FOREIGN KEY'
                   AND NOT LEFT(ccu.table_name, 3) = 'ir_'
-                  AND NOT ccu.table_name IN (
+                  /* Don't follow down the dependencies from these tables */
+                  AND NOT tc.table_name IN (
                     'res_users', 'res_company', 'res_country', 'res_currency')
                   AND tc.table_name = ANY(%s)
                   AND NOT ccu.table_name = ANY(%s)
                 ORDER BY 1;""", (list(tables), list(all_deps)))
+            data = cursor.fetchall()
             new_deps = set()
-            for table, parent in cursor.fetchall():
+            for table, parent in data:
                 if table not in excluded_tables:
                     new_deps.add(table)
                     all_deps.setdefault(table, set())
                     all_deps[table].add(parent)
             all_deps = _get_fk_dependencies_dict(
-                cursor, new_deps, excluded_tables, all_deps)
+                cursor, new_deps, excluded_tables + list(tables), all_deps)
         return all_deps
 
     def _get_m2m_dependencies_set(cursor, tables, excluded_tables):
         cursor.execute("""
-            SELECT tc.table_name, ccu.table_name
+            SELECT DISTINCT tc.table_name, ccu.table_name
             FROM information_schema.table_constraints AS tc
               JOIN information_schema.constraint_column_usage AS ccu
                 ON ccu.constraint_name = tc.constraint_name
