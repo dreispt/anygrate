@@ -26,7 +26,6 @@ def add_related_tables(target_connection, tables, excluded_tables):
                   JOIN information_schema.constraint_column_usage AS ccu
                     ON ccu.constraint_name = tc.constraint_name
                 WHERE constraint_type = 'FOREIGN KEY'
-                  AND NOT LEFT(ccu.table_name, 3) = 'ir_'
                   /* Don't follow down the dependencies from these tables */
                   AND NOT tc.table_name IN (
                     'res_users', 'res_company', 'res_country', 'res_currency')
