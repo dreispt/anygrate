@@ -1,3 +1,4 @@
+import collections
 import csv
 import logging
 import os
@@ -222,7 +223,7 @@ class CSVProcessor(object):
             # process each csv line
             for source_row in reader:
                 self.lines += 1
-                target_rows = {}
+                target_rows = collections.OrderedDict()
                 # process each column (also handle '_' as a possible new column)
                 source_row.update({'_': None})
                 for source_column in source_row:
@@ -240,7 +241,7 @@ class CSVProcessor(object):
                             target_rows[target_table][target_column] = source_row[source_column]
                         elif type(function) is str and function.startswith('__ref__'):
                             target_rows[target_table][target_column] = source_row[source_column]
-                            model_column = function.split()[1]
+                            model_column = ' ' in function  and function.split()[1]
                             self.ref_mapping[target_record] = model_column
 
                         elif function in (False, '__forget__'):
@@ -274,7 +275,7 @@ class CSVProcessor(object):
                     new_id = None
                     if discriminators and 'id' in target_row:
                         discriminator_value = tuple(
-                            target_row[x] for x in discriminators)
+                            str(target_row[x]) for x in discriminators)
                         new_id = self.KeyMap.assign_existing_id(
                             old_id, source_table, table, discriminator_value)
                     if new_id:
@@ -288,7 +289,7 @@ class CSVProcessor(object):
                         new_id = self.KeyMap.assign_new_id(
                             old_id, source_table, table)
                     target_row['id'] = new_id
-                    print('INS', table, 'PK', new_id, '->', target_row)
+                    # print('INS', table, 'PK', new_id, '->', target_row.get('name'))
                     self.writers[table].writerow(target_row)
                     stats['ins'] += 1
                     continue
@@ -375,7 +376,7 @@ class CSVProcessor(object):
             reader = csv.DictReader(target_csv, delimiter=',')
             stats = {'postprocess': 0}
             for target_row in reader:
-                postprocessed_row = {}
+                postprocessed_row = collections.OrderedDict()
                 # fix the foreign keys of the line
                 for key, value in list(target_row.items()):
                     target_record = table + '.' + key
@@ -388,13 +389,22 @@ class CSVProcessor(object):
                         stats['postprocess'] += 1
                     # manage __ref__
                     elif value and target_record in self.ref_mapping:
+                        # TODO REFACTOR: do not use the clumsy self.ref_mapping state keeping
+                        # Maybe handle this in the KeyMapa?
                         # first find the target table of the reference
-                        fk_table, fk_key = value.split(',')
-                        fk_id = self.KeyMap.get_id(fk_key, fk_table.replace('.', '_'))
-                        postprocessed_row[key] = fk_table + '.' + fk_id
+                        if ',' in value:
+                            fk_table, fk_key = value.split(',')
+                            fk_id = self.KeyMap.get_id(fk_key, fk_table.replace('.', '_'))
+                            postprocessed_row[key] = fk_table + ',' + str(fk_id)
+                        else:
+                            # case where table name is in another field
+                            fk_table = self.ref_mapping.get(table + '.' + key)
+                            fk_key = value
+                            fk_id = self.KeyMap.get_id(fk_key, fk_table.replace('.', '_'))
+                            postprocessed_row[key] = str(fk_id)
                         stats['postprocess'] += 1
                 self.writers[table].writerow(postprocessed_row)
-                print('FK', table, postprocessed_row)
+                # print('FK', table, postprocessed_row.get('name'))
             self.stats.setdefault(table, {}).update(stats)
             LOG.debug(
                 "Postprocessing %s:\t\t%d rows" % (table, stats['postprocess']))
