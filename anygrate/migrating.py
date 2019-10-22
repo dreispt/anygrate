@@ -92,7 +92,11 @@ def migrate(source_db, target_db, source_tables, mapping_names,
 
     # Get the list of modules installed in the target db
     with target_connection.cursor() as c:
-        c.execute("select name from ir_module_module where state='installed'")
+        # TODO: list only modules taht have Models
+        c.execute("""
+        select name from ir_module_module
+        where state='installed' order by name
+        """)
         target_modules = [m[0] for m in c.fetchall()]
 
     # construct the mapping and the csv processor
@@ -147,8 +151,11 @@ def migrate(source_db, target_db, source_tables, mapping_names,
         sys.exit(1)
 
     # execute deferred updates for preexisting data
-    print('Updating pre-existing data...')
-    for table in target_tables:
+    # DR not supported now
+    # TODO ROADMAP: support possibility to update existing data
+    for table in []:
+    #print('Updating pre-existing data...')
+    # for table in target_tables:
         filepath = join(target_dir, table + '.update2.csv')
         if not exists(filepath):
             LOG.warn('Not updating %s as it was not imported', table)
@@ -167,7 +174,6 @@ def migrate(source_db, target_db, source_tables, mapping_names,
     rate = lines / seconds
     print('Migrated %s lines in %s seconds (%s lines/s)'
           % (processor.lines, int(seconds), int(rate)))
-
 
 if __name__ == '__main__':
     main()
