@@ -41,8 +41,11 @@ class Mapping(object):
         self.extract_sql = {}
         for module in modules:
             if module not in full_mapping:
-                LOG.warn('Mapping is not complete: module "%s" is missing!', module)
+                LOG.debug('Mapping is not complete: module "%s" is missing!', module)
                 continue
+            # Tolerate empty module declaration
+            if not full_mapping.get(module):
+                full_mapping[module] = {}
             for source_column, target_columns in full_mapping[module].items():
                 if '__' in source_column:
                     # skip special markers
@@ -84,9 +87,11 @@ class Mapping(object):
                     self.mapping[incolumn][outcolumn] = '__copy__'
                     continue
                 if function.startswith('__ref__'):
-                    if len(function.split()) != 2:
-                        raise ValueError('Error in the mapping file: "%s" is invalid in %s'
-                                         % (repr(function), outcolumn))
+                    # Reference fields can havet the target model coded in the value
+                    # Example: res.partner,7
+                    # if len(function.split()) != 2:
+                    #     raise ValueError('Error in the mapping file: "%s" is invalid in %s'
+                    #                      % (repr(function), outcolumn))
                     # we handle that in the postprocess
                     self.mapping[incolumn][outcolumn] = function
                     continue
@@ -106,15 +111,16 @@ class Mapping(object):
         # build the discriminator mapping
         self.discriminators = {}
         for mapping in full_mapping.values():
-            self.discriminators.update({
-                key.split('.')[0]: value
-                for key, value in mapping.items()
-                if '__discriminator__' in key})
-            # define query to pass to COPY instead of bare table name
-            self.extract_sql.update({
-                key.split('.')[0]: value
-                for key, value in mapping.items()
-                if '__query__' in key})
+            if mapping:
+                self.discriminators.update({
+                    key.split('.')[0]: value
+                    for key, value in mapping.items()
+                    if '__discriminator__' in key})
+                # define query to pass to COPY instead of bare table name
+                self.extract_sql.update({
+                    key.split('.')[0]: value
+                    for key, value in mapping.items()
+                    if '__query__' in key})
 
     def get_last_id(self, table):
         return self.last_ids.get(table, 0)
